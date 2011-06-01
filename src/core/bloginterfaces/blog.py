@@ -7,6 +7,9 @@ class Blog:
         self.url = ''
         self.isAdmin = False
 
+    def __str__(self):
+        return "'%s' - Blog Id: %s, Url: %s" %(self.name, self.id, self.url)
+
 class RubriqueBlogAccount:
     """Represents the settings of a blog account registered with Rubrique
     """
@@ -20,7 +23,7 @@ class RubriqueBlogAccount:
         if not apis:
             apis = {}
         self.apis = apis
-        self.preferred = perferred
+        self.preferred = preferred
         self.resolved = resolved
         self.rubrique_key = self.generate_rubrique_key()
 

@@ -31,6 +31,7 @@ class BlogManager(object):
         self.service_apis = {}
         self.posts = {} #
         self.localposts = {} #SQLiteShelf(self.dbpath, "localposts")
+        self.categories = {}
         try:
             self.current_blog = self.app_status['current_blog']
         except KeyError:
@@ -55,7 +56,7 @@ class BlogManager(object):
             os.makedirs(self.datapath, 0744)
         self.dbpath = os.path.join(self.datapath, "rubrique.db")
 
-    def resolve_blog(self, url, username, password, blog_id = None):
+    def get_blogs(self, url, username, password, blog_id = None):
         try:
             blog_service, homeurl, apis, preferred = rsd.get_rsd(url)
         except rsd.RSDError, e:
@@ -66,25 +67,17 @@ class BlogManager(object):
         blogid = apis[preferred]['blogID']
         resolved_blogtype = self._resolve(blogtype)
         service_api = self._service_api_factory(resolved_blogtype, api_url, username, password)
+        print "calling get blogs"
         blogs =  service_api.get_blogs()
-        blogacc = None
+        print blogs
+        for tblog in blogs:
+            print str(tblog)
         if not blogs:
             raise RubriqueBlogSetupError("Api is Unaware of any blogs")
-        if len(blogs) == 1:
-            blogacc = RubriqueBlogAccount(blogs[0].id, blogs[0].name, blogs[0].url, api_url, apis, preferred, resolved_blogtype)
-
-        elif blog_id:
-            for blog in blogs:
-                if blog.id == blogid:
-                    blogacc = RubriqueBlogAccount(blogs[0].id, blogs[0].name, blogs[0].url, api_url, apis, preferred, resolved_blogtype)
-        else:
-            #TODO User should select blog
-            pass
-        if blogacc:
-            self.blogs[blogacc.rubrique_key] = blogacc
-            return blogacc
-        else:
-            raise RubriqueBlogSetupError("The apis do not have a blog matching blogid '%s'" %(blogid))
+        blogaccs = []
+        for blog in blogs:
+            blogaccs.append(RubriqueBlogAccount(blog.id, blog.name, username, password, blog.url, api_url, apis, preferred, resolved_blogtype))
+        return blogaccs
 
     def _resolve(self, blogtype):
         if blogtype in [METAWEBLOG, WORDPRESS]: 
@@ -98,7 +91,9 @@ class BlogManager(object):
         else:
             raise RubriqueBlogSetupError("BlogType " + blogtype + " needs to be resolved")
 
-    def add_blog():
+    def add_blog(self, blogacc):
+        if blogacc:
+            self.blogs[blogacc.rubrique_key] = blogacc
         pass
 
     def set_current_blog(self, rubrique_key):

@@ -8,7 +8,7 @@ from glob import glob
 from PyQt4 import QtGui, QtCore
 from ui.rubrique_ui import Ui_MainWindow
 from PyQt4.QtCore import QObject,  Qt, QCoreApplication, QEvent, QFile, QFileInfo, QIODevice, QLatin1Char, QLatin1String, QPoint, QRegExp, QString, QStringList, QUrl
-from PyQt4.QtGui import QWidget,  QSizePolicy,  QIcon,  QLabel,  QSlider, QApplication, QColorDialog, QDesktopServices, QDialog, QFileDialog, QFontDatabase, QInputDialog, QMainWindow, QMessageBox, QMouseEvent, QStyleFactory, QTreeWidgetItem
+from PyQt4.QtGui import QWidget,  QComboBox, QSizePolicy,  QIcon,  QLabel,  QSlider, QApplication, QColorDialog, QDesktopServices, QDialog, QFileDialog, QFontDatabase, QInputDialog, QMainWindow, QMessageBox, QMouseEvent, QStyleFactory, QTreeWidgetItem, QWhatsThis
 from PyQt4.QtWebKit import QWebPage, QWebView, QWebSettings
 from core.blogmanager import getBlogManager,  Post
 import calendar
@@ -52,14 +52,20 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
 
         # Setup the ui.
         self.setupUi(self)
-        #self.tabWidget.setTabText(0,  "Edit View")
-        #self.tabWidget.setTabText(1,  "HTML Code")
         connect(self.tabWidget, SIGNAL("currentChanged(int)"), self.changeTab);
         self.resize(600, 600);
         self.blogs = {}
         #self.spacer = QWidget(self);
         #self.spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum);
         #self.standardToolBar.insertWidget(self.actionZoomOut, self.spacer);
+        self.labelSelector=QLabel("Current Blog: ", self.standardToolBar)
+        self.comboSelector=QComboBox(self.standardToolBar)
+        self.comboSelector.setEditable(False)
+        self.connect(self.comboSelector,
+                     SIGNAL("activated(int)"),
+                     self.slotCurrentBlogChanged)
+        self.standardToolBar.addWidget(self.labelSelector)
+        self.standardToolBar.addWidget(self.comboSelector)
 
         self.zoomLabel = QLabel();
         self.standardToolBar.insertWidget(self.actionZoomIn, self.zoomLabel);
@@ -121,6 +127,10 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         self.setWindowModified(False)
         self.changeZoom(100);
         self.setupBlogData();
+        self.populateComboSelector()
+
+    def slotCurrentBlogChanged(self):
+        pass
 
     def syncEditors(self,  force=False):
         #0 -> EditView 1->CodeView 2->Preview
@@ -138,10 +148,19 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
                self.editor  = currentIndex
         return True
         
+    def populateComboSelector(self, blog=None):
+        if blog:
+            self.comboSelector.addItem("%s: %s" %(blog.blogname, blog.username))
+            return
+        for rubrique_key in self.blogManager.blogs:
+            blog = self.blogManager.blogs[rubrique_key]
+            self.comboSelector.addItem("%s: %s" %(blog.blogname, blog.username))
+        return
     
     def addNewBlog(self):
         newblog = addblogdialog.addNewBlog()
         if not newblog: return
+        self.populateComboSelector(self.blogManager.current_blog)
         #self.blogManager.set_current_blog(newblog.rubrique_key)
         
     def donothing(self):

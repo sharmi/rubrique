@@ -13,6 +13,9 @@ class RubriqueBloggingError(Exception):
     def __init__(self, msg):
         self.msg = msg
 
+    def __str__(self):
+        return "RubriqueBlogging Error: %s" %self.msg
+
 class Adapter(object):
  
     def __init__(self, url, username, password, blogid=None):
@@ -25,7 +28,7 @@ class Adapter(object):
     def authenticate(self):
         raise RubriqueBloggingError("Failed To Authenticate. Auth routine not implemented")
 
-    def get_posts(self, default_count=20):
+    def get_posts(self, count=20):
         pass
 
     def publish_post(self, post):
@@ -58,7 +61,7 @@ class MetaWeblogAdapter(Adapter):
     def handleMWException(f):
         def new_f(*args):
             try:
-                f(*args)
+                return f(*args)
             except MetaWeblogException, e:
                 log.error(e)
                 raise RubriqueBloggingError(e.message)
@@ -75,8 +78,8 @@ class MetaWeblogAdapter(Adapter):
         return self.client.selectBlog(blogid)
 
     @handleMWException
-    def get_posts(self, default_count=20):
-           return self.client.getRecentPosts(default_count) 
+    def get_posts(self, count=20):
+           return self.client.getRecentPosts(count) 
 
     @handleMWException
     def publish_draft(self, post):
@@ -100,7 +103,9 @@ class MetaWeblogAdapter(Adapter):
 
     @handleMWException
     def get_blogs(self):
-        return self.client.getUserBlogs()
+        blogs = [blog for blog in self.client.getUsersBlogs()]
+        print blogs
+        return blogs
 
     @handleMWException
     def upload_media_obj(self, filename=None, fileobj=None):

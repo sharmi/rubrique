@@ -1,10 +1,11 @@
 import logging
 import urllib2
-from PyQt4.QtGui import QDialog, QFrame
+from PyQt4.QtGui import QDialog, QFrame, QMessageBox
 from PyQt4.QtCore import QObject, SIGNAL, SLOT
 from ui.addblogui import Ui_AddBlogDialog 
 from core.blogmanager import getBlogManager, RubriqueBlogSetupError, UnknownPlatform
-
+from core.bloginterfaces.adapter import RubriqueBloggingError
+from chooseblogdialog import ChooseBlogDialog
 log = logging.getLogger("rubrique")
 connect = QObject.connect
 class AddBlogDialog(QDialog, Ui_AddBlogDialog):
@@ -15,6 +16,7 @@ class AddBlogDialog(QDialog, Ui_AddBlogDialog):
         self.setupUi(self)
         connect(self.addBlogButtonBox, SIGNAL("accepted()"), self.verifyAndAddBlog) #AddBlogDialog.accept)
         connect(self.addBlogButtonBox, SIGNAL("rejected()"), self.reject)#AddBlogDialog.reject)
+        self.blogManager = getBlogManager()
 
     def getData(self):
         data = {}
@@ -34,6 +36,13 @@ class AddBlogDialog(QDialog, Ui_AddBlogDialog):
             self.warninglbl.setFrameStyle(QFrame.Panel | QFrame.Sunken);
             self.warninglbl.setWordWrap(True)
             self.warninglbl.setText("<i><font color='red'>%s</font></i>" % message)
+    
+    def addToDB(self, blog):
+        self.blogManager.add_blog(blog)
+        self.blogManager.set_current_blog(blog.rubrique_key)
+        title = "Added New Blog: %s"% blog.blogname 
+        message = "The blog with the following details have been added to the repository.\n Blog Name: %s\nUsername: %s\nUrl: %s\nBlog Engine: %s" %(blog.blogname, blog.username, blog.homeurl, blog.apis[blog.preferred]['name']) 
+        QMessageBox.information(self, title, message, QMessageBox.Ok, QMessageBox.Ok) 
 
     def verifyAndAddBlog(self):
         if not self.verifyData(): return
@@ -48,13 +57,22 @@ class AddBlogDialog(QDialog, Ui_AddBlogDialog):
         else:
             api = None
         log.info("User Input Data: url:%s, username:%s, password:%s, api:%s, endpoint:%s" %(url, username, password, api, endpoint))
-        blogManager = getBlogManager()
         try:
-            newblog = blogManager.resolve_blog(url, username, password)
-            blogManager.set_current_blog(newblog.rubrique_key)
-            self.accept()
+            available_blogs = self.blogManager.get_blogs(url, username, password)
+            if len(available_blogs) > 1:
+                choose_blog_dialog = ChooseBlogDialog(available_blogs, self.addToDB)
+                if choose_blog_dialog.exec_():
+                    self.accept()
+
+            elif len(available_blogs) == 1:
+                self.addToDB(available_blogs[0])
+
+            #self.blogManager.set_current_blog(newblog.rubrique_key)
+                self.accept()
         #TODO asking for and resolving endpoints
         except RubriqueBlogSetupError,e:
+           addBlogDialog.setWarning(str(e))
+        except RubriqueBloggingError,e:
            addBlogDialog.setWarning(str(e))
         except UnknownPlatform, e:
            addBlogDialog.setWarning(str(e))

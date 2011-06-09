@@ -5,7 +5,7 @@ class Features(object):
     def __init__(self):
         self.posts = True
         self.categories  = False
-        self.categories_add = False
+        self.categoriesAdd = False
         self.pages = False
         self.tags = False
 
@@ -28,28 +28,28 @@ class Adapter(object):
     def authenticate(self):
         raise RubriqueBloggingError("Failed To Authenticate. Auth routine not implemented")
 
-    def get_posts(self, count=20):
+    def getPosts(self, count=20):
         pass
 
-    def publish_post(self, post):
+    def publishPost(self, post):
         pass
 
-    def publish_draft(self, post):
+    def publishDraft(self, post):
         pass
 
-    def get_categories(self):
+    def getCategories(self):
         pass
 
-    def add_category(self, category):
+    def addCategory(self, category):
         pass
 
-    def update_post(self, post):
+    def updatePost(self, post):
         pass
 
-    def get_blogs(self):
+    def getBlogs(self):
         pass
 
-    def upload_media_obj(self):
+    def uploadMediaObj(self):
         pass
 
 class MetaWeblogAdapter(Adapter):
@@ -74,41 +74,40 @@ class MetaWeblogAdapter(Adapter):
         pass
 
     @handleMWException
-    def select_blog(self, blogid):
+    def selectBlog(self, blogid):
         return self.client.selectBlog(blogid)
 
     @handleMWException
-    def get_posts(self, count=20):
+    def getPosts(self, count=20):
            return self.client.getRecentPosts(count) 
 
     @handleMWException
-    def publish_draft(self, post):
+    def publishDraft(self, post):
         self.client.newPost(post, False)
 
     @handleMWException
-    def publish_post(self, post):
+    def publishPost(self, post):
         self.client.newPost(post, True)
 
     @handleMWException
-    def get_categories(self):
+    def getCategories(self):
         return self.client.getCategoryList()
 
     @handleMWException
-    def add_category(self, category):
+    def addCategory(self, category):
         pass
 
     @handleMWException
-    def update_post(self, post, publish):
+    def updatePost(self, post, publish):
         self.client.editPost(post.id, post,  publish) 
 
     @handleMWException
-    def get_blogs(self):
+    def getBlogs(self):
         blogs = [blog for blog in self.client.getUsersBlogs()]
-        print blogs
         return blogs
 
     @handleMWException
-    def upload_media_obj(self, filename=None, fileobj=None):
+    def uploadMediaObj(self, filename=None, fileobj=None):
         self.client.newMediaObject(self, filename, fileobj)
 
 

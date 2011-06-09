@@ -1,3 +1,5 @@
+import pod
+
 class Blog:
     """Represents blog item
     """    
@@ -9,33 +11,48 @@ class Blog:
 
     def __str__(self):
         return "'%s' - Blog Id: %s, Url: %s" %(self.name, self.id, self.url)
+    
+def generateRubriqueKey(blogname, username):
+        import re
+        import hashlib
+        blogname = re.sub('[\W_]+', '', blogname)[:5]
+        bloghash = hashlib.md5(blogname + username).hexdigest()
+        username = re.sub('[\W_]+', '', username)[:5]
 
-class RubriqueBlogAccount:
+        return "%s_%s_%s" %(blogname, username, bloghash[:5])
+
+class RubriqueBlogAccount():
     """Represents the settings of a blog account registered with Rubrique
     """
-    def __init__(self, blogid, blogname, username, password, homeurl, api_url, apis, preferred, resolved):
+    def __init__(self, blogid, blogname, username, password, homeurl, apiurl, apis, preferred, resolved):
         self.blogid = blogid
         self.blogname = blogname.strip()
         self.username = username.strip()
         self.password = password
         self.homeurl = homeurl
-        self.api_url = api_url
+        self.apiurl = apiurl
         if not apis:
             apis = {}
         self.apis = apis
         self.preferred = preferred
         self.resolved = resolved
-        self.rubrique_key = self.generate_rubrique_key()
+        self.rubriqueKey = generateRubriqueKey(self.blogname, self.username)
 
-    def generate_rubrique_key(self):
-        import re
-        import hashlib
-        blogname = re.sub('[\W_]+', '', self.blogname)[:5]
-        bloghash = hashlib.md5(self.blogname + self.username).hexdigest()
-        username = re.sub('[\W_]+', '', self.username)[:5]
+class RubriqueBlogAccountPOD(pod.Object):
+        def __init__(self, rubriqueAcc):
+            pod.Object.__init__(self)
+            self.blogid = rubriqueAcc.blogid
+            self.blogname = rubriqueAcc.blogname.strip()
+            self.username = rubriqueAcc.username.strip()
+            self.password = rubriqueAcc.password
+            self.homeurl = rubriqueAcc.homeurl
+            self.apiurl = rubriqueAcc.apiurl
+            self.apis = rubriqueAcc.apis
+            self.preferred = rubriqueAcc.preferred
+            self.resolved = rubriqueAcc.resolved
+            self.rubriqueKey = generateRubriqueKey(self.blogname, self.username)
 
-        return "%s_%s_%s" %(blogname, username, bloghash)
-
+            
 class User:
     """Represents user item
     """    
@@ -46,19 +63,22 @@ class User:
         self.nickname = ''
         self.email = ''
         
-class Category:
+class Category(pod.Object):
     """Represents category item
     """    
     def __init__(self):
-        self.id = 0
+        pod.Object.__init__(self)
         self.name = ''
+        self.catId = ''
+        self.blogId = ''
+        self.parentId= ''
         self.isPrimary = False
-    
-class Post:
+
+class OnlinePost(pod.Object):
     """Represents post item
-    """    
+    """ 
     def __init__(self):
-        self.id = 0
+        pod.Object.__init__(self)
         self.title = ''
         self.date = None
         self.permaLink = ''
@@ -73,4 +93,45 @@ class Post:
         self.allowComments = False
         self.status = ''
 
+    def __str__(self):
+        to_return = []
+        for item, value in self.__dict__.iteritems():
+            to_return.append("%s: %s" %(item, value))
+        return "\n".join(to_return)
 
+
+class Post(pod.Object):
+    def __init__(self):
+        pod.Object.__init__(self)
+        self.title = ''
+        self.date = None
+        self.permaLink = ''
+        self.description = ''
+        self.textMore = ''
+        self.excerpt = ''
+        self.link = ''
+        self.categories = []
+        self.tags = ''
+        self.user = ''
+        self.allowPings    = False
+        self.allowComments = False
+        self.status = ''
+
+    def __str__(self):
+        to_return = []
+        for item, value in self.__dict__.iteritems():
+            to_return.append("%s: %s" %(item, value))
+        return "\n".join(to_return)
+
+
+class LocalPost(Post):
+    pass
+
+class OnlinePost(Post):
+    pass
+
+
+#class RubriqueAppStatus(pod.Object):
+#    def __init__(self, state, value):
+#        self.state = state
+#        self.value = value

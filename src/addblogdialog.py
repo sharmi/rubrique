@@ -38,8 +38,8 @@ class AddBlogDialog(QDialog, Ui_AddBlogDialog):
             self.warninglbl.setText("<i><font color='red'>%s</font></i>" % message)
     
     def addToDB(self, blog):
-        self.blogManager.add_blog(blog)
-        self.blogManager.set_current_blog(blog.rubrique_key)
+        self.blogManager.addBlog(blog)
+        self.blogManager.setCurrentBlog(blog.rubriqueKey)
         title = "Added New Blog: %s"% blog.blogname 
         message = "The blog with the following details have been added to the repository.\n Blog Name: %s\nUsername: %s\nUrl: %s\nBlog Engine: %s" %(blog.blogname, blog.username, blog.homeurl, blog.apis[blog.preferred]['name']) 
         QMessageBox.information(self, title, message, QMessageBox.Ok, QMessageBox.Ok) 
@@ -58,7 +58,7 @@ class AddBlogDialog(QDialog, Ui_AddBlogDialog):
             api = None
         log.info("User Input Data: url:%s, username:%s, password:%s, api:%s, endpoint:%s" %(url, username, password, api, endpoint))
         try:
-            available_blogs = self.blogManager.get_blogs(url, username, password)
+            available_blogs = self.blogManager.getBlogs(url, username, password)
             if len(available_blogs) > 1:
                 choose_blog_dialog = ChooseBlogDialog(available_blogs, self.addToDB)
                 if choose_blog_dialog.exec_():
@@ -67,7 +67,7 @@ class AddBlogDialog(QDialog, Ui_AddBlogDialog):
             elif len(available_blogs) == 1:
                 self.addToDB(available_blogs[0])
 
-            #self.blogManager.set_current_blog(newblog.rubrique_key)
+            #self.blogManager.set_current_blog(newblog.rubriqueKey)
                 self.accept()
         #TODO asking for and resolving endpoints
         except RubriqueBlogSetupError,e:

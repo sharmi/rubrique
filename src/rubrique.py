@@ -7,10 +7,10 @@ from urlparse import urlunsplit
 from glob import glob 
 from PyQt4 import QtGui, QtCore
 from ui.rubrique_ui import Ui_MainWindow
-from PyQt4.QtCore import QObject,  Qt, QCoreApplication, QEvent, QFile, QFileInfo, QIODevice, QLatin1Char, QLatin1String, QPoint, QRegExp, QString, QStringList, QUrl
+from PyQt4.QtCore import QObject,  Qt, QCoreApplication, QEvent, QFile, QFileInfo, QIODevice, QLatin1Char, QLatin1String, QPoint, QRegExp, QString, QStringList, QTimer, QUrl
 from PyQt4.QtGui import QWidget,  QComboBox, QSizePolicy,  QIcon,  QLabel,  QSlider, QApplication, QColorDialog, QDesktopServices, QDialog, QFileDialog, QFontDatabase, QInputDialog, QMainWindow, QMessageBox, QMouseEvent, QStyleFactory, QTreeWidgetItem, QWhatsThis
 from PyQt4.QtWebKit import QWebPage, QWebView, QWebSettings
-from core.blogmanager import getBlogManager,  Post
+from core.blogmanager import getBlogManager
 import calendar
 from xml.sax.saxutils import quoteattr
 import addblogdialog 
@@ -26,10 +26,14 @@ log.setLevel(logging.DEBUG)
 
 # This handler writes everything to a file.
 h1 = logging.FileHandler("rubrique.log")
+h2 = logging.StreamHandler(sys.stdout)
 f = logging.Formatter("%(levelname)s %(asctime)s %(funcName)s %(lineno)d %(message)s")
 h1.setFormatter(f)
+h2.setFormatter(f)
 h1.setLevel(logging.DEBUG)
+h2.setLevel(logging.DEBUG)
 log.addHandler(h1)
+log.addHandler(h2)
 
 #self.tr = QObject.self.tr
 def alert(msg):
@@ -78,29 +82,13 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         self.zoomSlider.setPageStep(100);
         self.standardToolBar.insertWidget(self.actionZoomOut, self.zoomSlider);
 
-        connect(self.zoomSlider, SIGNAL("valueChanged(int)"), self.changeZoom);
         self.editView.setHtml(open('html/editor.html').read())
         self.codeView.setHtml(open('html/codemirrorui.html').read())
         self.editView.page().setContentEditable(False);
         self.codeView.page().setContentEditable(False);
-        connect(self.actionPublish,  SIGNAL("triggered()"), self.publish)
-        connect(self.actionFileNew, SIGNAL("triggered()"), self.fileNew);
-        connect(self.actionFileOpen, SIGNAL("triggered()"), self.fileOpen);
-        connect(self.actionFileSave, SIGNAL("triggered()"), self.fileSave);
-        connect(self.actionFileSaveAs, SIGNAL("triggered()"), self.fileSaveAs);
-        connect(self.actionExit, SIGNAL("triggered()"), self.close);
-        connect(self.actionZoomOut, SIGNAL("triggered()"), self.zoomOut);
-        connect(self.actionZoomIn, SIGNAL("triggered()"), self.zoomIn);
-        connect(self.actionAddNewBlog, SIGNAL("triggered()"), self.addNewBlog)     
-  
-        # Qt 4.5.0 has a bug: always returns 0 for QWebPage.SelectAll
-        
-    
-        #necessary to sync our actions
-        #connect(self.editView.page(), SIGNAL("selectionChanged()"), self.adjustActions);
-    
-        connect(self.editView.page(), SIGNAL("contentsChanged()"), self.adjustSource);
-        connect(self.tabWidget,  SIGNAL("currentChanged(int)"),  self.syncEditors)
+
+        self.setupBlogData();
+
         self.editor = 0;
         
         self.editView.setFocus();
@@ -110,28 +98,66 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         #codedir = os.path.dirname( os.path.realpath( __file__ ) )
         codedir = determine_path()
         self.visualViewSrc = urlunsplit(('file', '', os.path.join(codedir, 'html', 'editor.html'), '', ''))
+        #self.visualViewSrc = urlunsplit(('file', '', os.path.join(codedir, 'html', 'file-click-demo.html'), '', ''))
         self.htmlViewSrc =  urlunsplit(('file', '', os.path.join(codedir, 'html', 'codemirrorui.html'), '', ''))
 
         #if not self.load(initialFile):
         #    self.fileNew();
         settings = self.editView.page().settings()
-        settings.setAttribute(QWebSettings.JavascriptEnabled, True)
+        settings.setAttribute(QWebSettings.JavascriptEnabled, True
+        )
         settings.setAttribute(QWebSettings.JavascriptCanAccessClipboard, True)
+        settings.setAttribute(QWebSettings.LocalContentCanAccessRemoteUrls, True)
+        settings.setAttribute(QWebSettings.LocalContentCanAccessFileUrls, True)
         settings = self.codeView.page().settings()
         settings.setAttribute(QWebSettings.JavascriptEnabled, True)
         settings.setAttribute(QWebSettings.JavascriptCanAccessClipboard, True)
-        
+        settings.setAttribute(QWebSettings.LocalContentCanAccessRemoteUrls, True)
+        settings.setAttribute(QWebSettings.LocalContentCanAccessFileUrls, True)
         self.editView.load(QUrl(self.visualViewSrc))
         self.codeView.load(QUrl(self.htmlViewSrc))
-        self.adjustSource();
+        self.adjustSource()
         self.setWindowModified(False)
-        self.changeZoom(100);
-        self.setupBlogData();
-        self.populateComboSelector()
+        self.changeZoom(100)
+        self.autosaveTimer = QTimer(self)
+        connect(self.autosaveTimer, SIGNAL("timeout()"), self.saveBlogContent)
+        self.autosaveTimer.start(2000)
+        connect(self.zoomSlider, SIGNAL("valueChanged(int)"), self.changeZoom);
+        connect(self.actionPublish,  SIGNAL("triggered()"), self.publish)
+        connect(self.actionFileNew, SIGNAL("triggered()"), self.fileNew);
+        connect(self.actionFileOpen, SIGNAL("triggered()"), self.fileOpen);
+        connect(self.actionFileSave, SIGNAL("triggered()"), self.fileSave);
+        connect(self.actionFileSaveAs, SIGNAL("triggered()"), self.fileSaveAs);
+        connect(self.actionExit, SIGNAL("triggered()"), self.close);
+        connect(self.actionZoomOut, SIGNAL("triggered()"), self.zoomOut);
+        connect(self.actionZoomIn, SIGNAL("triggered()"), self.zoomIn);
+        connect(self.actionAddNewBlog, SIGNAL("triggered()"), self.addNewBlog)     
+        connect(self.postTitleTxt, SIGNAL("textEdited(QString)"), self.blogManager.setTitle) 
+        connect(self.excerptTxt, SIGNAL("textChanged()"), self.setExcerpt)
+        connect(self.trackbacksCheck, SIGNAL("stateChanged(int)"), self.blogManager.allowTrackbacks)
+        connect(self.commentsCheck, SIGNAL("stateChanged(int)"), self.blogManager.allowComments)
+        # Qt 4.5.0 has a bug: always returns 0 for QWebPage.SelectAll
+        
+    
+        #necessary to sync our actions
+        #connect(self.editView.page(), SIGNAL("selectionChanged()"), self.adjustActions);
+    
+        connect(self.editView.page(), SIGNAL("contentsChanged()"), self.adjustSource);
+        connect(self.tabWidget,  SIGNAL("currentChanged(int)"),  self.syncEditors)
+
 
     def slotCurrentBlogChanged(self):
         pass
 
+    def setExcerpt(self):
+        self.blogManager.setExcerpt(self.excerptTxt.toPlainText())
+
+    def initUIData(self):
+        print self.blogManager.getTitle(), self.blogManager.getExcerpt()
+        self.postTitleTxt.setText(self.blogManager.getTitle())
+        self.excerptTxt.setPlainText(self.blogManager.getExcerpt())
+        self.trackbacksCheck.setChecked(self.blogManager.allowTrackbacks())
+        self.commentsCheck.setChecked(self.blogManager.allowComments())
     def syncEditors(self,  force=False):
         #0 -> EditView 1->CodeView 2->Preview
         currentIndex =  self.tabWidget.currentIndex()
@@ -152,21 +178,23 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         if blog:
             self.comboSelector.addItem("%s: %s" %(blog.blogname, blog.username))
             return
-        for rubrique_key in self.blogManager.blogs:
-            blog = self.blogManager.blogs[rubrique_key]
+        for blog in self.blogManager.blogs:
+            #blog = self.blogManager.blogs[rubrique_key]
             self.comboSelector.addItem("%s: %s" %(blog.blogname, blog.username))
         return
     
     def addNewBlog(self):
         newblog = addblogdialog.addNewBlog()
         if not newblog: return
-        self.populateComboSelector(self.blogManager.current_blog)
+        self.populateComboSelector(self.blogManager.currentBlog)
         #self.blogManager.set_current_blog(newblog.rubrique_key)
         
     def donothing(self):
         pass
     def setupBlogData(self):
         self.blogManager = getBlogManager()
+        self.populateComboSelector()
+        self.initUIData()
         #self.blogManager.add_blog('wordpress', 'http://www.minvolai.com/blog/xmlrpc.php', 'sharmila', 'letmein')
         #self.populatePosts()
     
@@ -201,14 +229,15 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         action.setEnabled(True)
         self.connect(action1, SIGNAL("triggered()"), self.editView.pageAction(action2),  SLOT("trigger()")); 
         #self.connect(self.editView.pageAction(action2), SIGNAL("changed()"), self.adjustActions);
-    
-    def publish(self):
-        post = Post()
-        post.title =  'Post from Rubrique'
+   
+    def saveBlogContent(self):
         self.syncEditors(force=True)
-        post.description = self.getEditData()# "Python is great to code in and Qt is great too!" #self.editView.page().mainFrame().toHtml().toUtf8();
+        self.blogManager.setPostBody(self.getEditData())
+
+    def publish(self):
+        self.saveBlogContent()
         #post.categories = (wordpress.getCategoryIdFromName('Python'),)
-        self.blogManager.publish(post)
+        self.blogManager.publish()
         
         
     def maybeSave(self):

@@ -84,7 +84,7 @@
            <enum>QTabWidget::Rounded</enum>
           </property>
           <property name="currentIndex">
-           <number>1</number>
+           <number>0</number>
           </property>
           <widget class="QWidget" name="blogposts">
            <property name="accessibleName">
@@ -99,9 +99,6 @@
               <attribute name="headerVisible">
                <bool>false</bool>
               </attribute>
-              <attribute name="headerVisible">
-               <bool>false</bool>
-              </attribute>
               <column>
                <property name="text">
                 <string notr="true">Posts</string>
@@ -111,13 +108,13 @@
             </item>
            </layout>
           </widget>
-          <widget class="QWidget" name="localposts">
+          <widget class="QWidget" name="localpostsBgWidget">
            <attribute name="title">
             <string>Local Posts</string>
            </attribute>
            <layout class="QVBoxLayout" name="verticalLayout_4">
             <item>
-             <widget class="QListWidget" name="list"/>
+             <widget class="QListWidget" name="localpostsList"/>
             </item>
            </layout>
           </widget>
@@ -144,7 +141,7 @@
            <enum>QFrame::Raised</enum>
           </property>
           <property name="currentIndex">
-           <number>0</number>
+           <number>3</number>
           </property>
           <widget class="QWidget" name="tb_categories">
            <property name="geometry">
@@ -152,7 +149,7 @@
              <x>0</x>
              <y>0</y>
              <width>230</width>
-             <height>181</height>
+             <height>172</height>
             </rect>
            </property>
            <attribute name="label">
@@ -170,9 +167,6 @@
                </property>
                <item>
                 <widget class="QTreeWidget" name="categoriestree">
-                 <attribute name="headerVisible">
-                  <bool>false</bool>
-                 </attribute>
                  <attribute name="headerVisible">
                   <bool>false</bool>
                  </attribute>
@@ -194,7 +188,7 @@
              <x>0</x>
              <y>0</y>
              <width>230</width>
-             <height>181</height>
+             <height>172</height>
             </rect>
            </property>
            <attribute name="label">
@@ -241,7 +235,7 @@
               </property>
               <layout class="QVBoxLayout" name="verticalLayout_5">
                <item>
-                <widget class="QCheckBox" name="trackbackCheck">
+                <widget class="QCheckBox" name="trackbacksCheck">
                  <property name="text">
                   <string>Allow Trackbacks</string>
                  </property>
@@ -265,7 +259,7 @@
              <x>0</x>
              <y>0</y>
              <width>230</width>
-             <height>128</height>
+             <height>172</height>
             </rect>
            </property>
            <attribute name="label">
@@ -282,7 +276,7 @@
                 <number>0</number>
                </property>
                <item>
-                <widget class="QTextEdit" name="textEdit"/>
+                <widget class="QPlainTextEdit" name="excerptTxt"/>
                </item>
               </layout>
              </widget>
@@ -314,14 +308,14 @@
          <number>1</number>
         </property>
         <item row="0" column="0">
-         <widget class="QLabel" name="posttitlelbl">
+         <widget class="QLabel" name="postTitleLbl">
           <property name="text">
            <string>Post Title</string>
           </property>
          </widget>
         </item>
         <item row="0" column="1">
-         <widget class="QLineEdit" name="posttitletxt"/>
+         <widget class="QLineEdit" name="postTitleTxt"/>
         </item>
         <item row="1" column="0" colspan="2">
          <widget class="QTabWidget" name="tabWidget">
@@ -362,8 +356,8 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QWebView" name="editView">
-              <property name="url">
+             <widget class="QWebView" name="editView" native="true">
+              <property name="url" stdset="0">
                <url>
                 <string>about:blank</string>
                </url>
@@ -385,8 +379,8 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QWebView" name="codeView">
-              <property name="url">
+             <widget class="QWebView" name="codeView" native="true">
+              <property name="url" stdset="0">
                <url>
                 <string>about:blank</string>
                </url>
@@ -408,8 +402,8 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QWebView" name="preView">
-              <property name="url">
+             <widget class="QWebView" name="preView" native="true">
+              <property name="url" stdset="0">
                <url>
                 <string>about:blank</string>
                </url>

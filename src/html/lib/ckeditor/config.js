@@ -15,7 +15,7 @@ CKEDITOR.editorConfig = function( config )
 	config.toolbar_RubriqueEditorToolbar =
 [
 
-    ['Source', 'Preview', 'Cut','Copy','Paste','PasteText','PasteFromWord','-','Print', 'SpellChecker', 'Scayt'],
+    ['Cut','Copy','Paste','PasteText','PasteFromWord','-','Print', 'SpellChecker', 'Scayt'],
     ['Undo','Redo','-','Find','Replace','-','SelectAll','RemoveFormat'],
 	['Link','Unlink','Anchor'],
     ['Image','Flash','Table','HorizontalRule','Smiley','SpecialChar','PageBreak'],

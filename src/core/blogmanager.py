@@ -1,8 +1,9 @@
 import platform
 import os
+import sys
 import logging
-from core.lib.sqliteshelf import SQLiteShelf
-from core.bloginterfaces.blog import RubriqueBlogAccount, Post
+import pod
+from core.bloginterfaces.blog import RubriqueBlogAccount, LocalPost, Category, OnlinePost, RubriqueBlogAccountPOD
 import core.bloginterfaces.adapter as adapter
 import rsd
 METAWEBLOG = 'metaweblog'
@@ -25,25 +26,32 @@ class UnknownPlatform(Exception):
 class BlogManager(object):
     myAppDataFolder = "rubrique"
     def __init__(self):
-        self.__setup_data_path()
-        self.blogs = SQLiteShelf(self.dbpath, "blogs")
-        self.app_status = SQLiteShelf(self.dbpath, "app_status")
-        self.service_apis = {}
-        self.posts = {} #
-        self.localposts = {} #SQLiteShelf(self.dbpath, "localposts")
-        self.categories = {}
+        self.__setupDataPath()
+        self.blogs = RubriqueBlogAccountPOD
+        self.serviceApis = {}
+        self.posts = OnlinePost  #
+        self.localposts = LocalPost
+        self.categories = Category
+        self.appStatus = self.db.store
         try:
-            self.current_blog = self.app_status['current_blog']
-        except KeyError:
-            self.current_blog = None
+            if self.appStatus.currentBlog:
+                self.setCurrentBlog(self.appStatus.currentBlog.rubriqueKey)
+        except pod.db.PodStoreError:
+            self.currentBlog = None
         try:
-            self.current_post = self.app_status['current_post']
-        except KeyError:
-            self.current_post = None
+            self.currentPost = self.appStatus.currentPost
+        except pod.db.PodStoreError:
+            print "no current post"
+            self.currentPost = LocalPost()
+            self.appStatus.currentPost = self.currentPost
+        print "here"
+        log.info("Current Post")
+        log.info(self.currentPost)
+        self.db.commit()
 
      
         
-    def __setup_data_path(self):
+    def __setupDataPath(self):
         if platform.system() == "Linux":
             self.datapath = os.path.join(os.path.expanduser("~") , ".local" , "share",  self.myAppDataFolder)
         elif platform.system() == "Windows":
@@ -55,28 +63,28 @@ class BlogManager(object):
         if not os.path.exists(self.datapath):
             os.makedirs(self.datapath, 0744)
         self.dbpath = os.path.join(self.datapath, "rubrique.db")
+        self.db= pod.Db(file=self.dbpath)
 
-    def get_blogs(self, url, username, password, blog_id = None):
+
+    def getBlogs(self, url, username, password, blogId = None):
         try:
-            blog_service, homeurl, apis, preferred = rsd.get_rsd(url)
+            blogService, homeurl, apis, preferred = rsd.get_rsd(url)
         except rsd.RSDError, e:
             raise RubriqueBlogSetupError("Failed to resolve blogtype. Manual entry required. Error Message as follows '%s'" %e)
             return -1
-        api_url = apis[preferred]['apiLink']
+        apiurl = apis[preferred]['apiLink']
         blogtype = preferred
         blogid = apis[preferred]['blogID']
-        resolved_blogtype = self._resolve(blogtype)
-        service_api = self._service_api_factory(resolved_blogtype, api_url, username, password)
-        print "calling get blogs"
-        blogs =  service_api.get_blogs()
-        print blogs
+        resolvedBlogtype = self._resolve(blogtype)
+        serviceApi = self._serviceApiFactory(resolvedBlogtype, apiurl, username, password)
+        blogs =  serviceApi.getBlogs()
         for tblog in blogs:
-            print str(tblog)
+            log.info("Detected Blog " + str(tblog))
         if not blogs:
             raise RubriqueBlogSetupError("Api is Unaware of any blogs")
         blogaccs = []
         for blog in blogs:
-            blogaccs.append(RubriqueBlogAccount(blog.id, blog.name, username, password, blog.url, api_url, apis, preferred, resolved_blogtype))
+            blogaccs.append(RubriqueBlogAccount(blog.id, blog.name, username, password, blog.url, apiurl, apis, preferred, resolvedBlogtype))
         return blogaccs
 
     def _resolve(self, blogtype):
@@ -85,32 +93,91 @@ class BlogManager(object):
         else:
             raise RubriqueBlogSetupError("BlogType " + blogtype + " is not supported")
 
-    def _service_api_factory(self, blogtype, api_url, username, password):
+    def _serviceApiFactory(self, blogtype, apiurl, username, password):
         if blogtype  == METAWEBLOG: 
-            return adapter.MetaWeblogAdapter(api_url, username, password)
+            return adapter.MetaWeblogAdapter(apiurl, username, password)
         else:
             raise RubriqueBlogSetupError("BlogType " + blogtype + " needs to be resolved")
 
-    def add_blog(self, blogacc):
+    def _serviceApiForAcc(self, blogacc):
+        return self._serviceApiFactory(blogacc.resolved, blogacc.apiurl, blogacc.username, blogacc.password)
+
+    def addBlog(self, blogacc):
         if blogacc:
-            self.blogs[blogacc.rubrique_key] = blogacc
+            RubriqueBlogAccountPOD(blogacc)
+            self.db.commit()
         pass
 
-    def set_current_blog(self, rubrique_key):
-        self.current_blog = self.blogs[rubrique_key]
-        if rubrique_key not in self.posts:
-            self.posts[rubrique_key] = SQLiteShelf(self.dbpath, "posts_"+rubrique_key)
-        if rubrique_key not in self.localposts:
-            self.localposts[rubrique_key] = SQLiteShelf(self.dbpath, "localposts_"+rubrique_key)
-        if rubrique_key not in self.categories:
-            self.categories[rubrique_key] = SQLiteShelf(self.dbpath, "categories_"+rubrique_key)
+    def getBlogByKey(self, key):
+        return (self.blogs.where.rubriqueKey == key).get_one()
+
+    def setCurrentBlog(self, rubriqueKey):
+        self.currentBlog = self.getBlogByKey(rubriqueKey)
+        self.appStatus.currentBlog = self.currentBlog
+        if rubriqueKey not in self.serviceApis:
+            self.serviceApis[rubriqueKey] = self._serviceApiForAcc(self.currentBlog)
+        self.currentApi = self.serviceApis[rubriqueKey]
+        self.db.commit()
+        #if rubriqueKey not in self.posts:
+        #    self.posts[rubriqueKey] = SQLiteShelf(self.dbpath, "posts_"+rubriqueKey)
+        #if rubriqueKey not in self.localposts:
+        #    self.localposts[rubriqueKey] = SQLiteShelf(self.dbpath, "localposts_"+rubriqueKey)
+        #if rubriqueKey not in self.categories:
+        #    self.categories[rubriqueKey] = SQLiteShelf(self.dbpath, "categories_"+rubriqueKey)
 
     def get_latest_posts(self, num=10):
-        return self.current_blog.getRecentPosts(num)
+        return self.currentBlog.getRecentPosts(num)
         
-    def publish(self,  post):
-        self.current_blog.newPost(post,  True)
+    def publish(self):
+        self.currentApi.publishPost(self.currentPost)
 
+    def dbCommit(f):
+        def funcDBCommit(*args):
+            returnVal = f(*args)
+            args[0].db.commit()
+            return returnVal
+        funcDBCommit.__name__ = f.__name__
+        return funcDBCommit
+
+    @dbCommit
+    def setPostBody(self, content):
+        self.currentPost.description = content
+
+    @dbCommit
+    def setTitle(self, title):
+        self.currentPost.title = title
+
+    @dbCommit
+    def getTitle(self):
+        return self.currentPost.title
+
+    @dbCommit
+    def getExcerpt(self):
+        return self.currentPost.excerpt
+
+    @dbCommit
+    def setExcerpt(self, excerpt):
+        self.currentPost.excerpt = excerpt
+
+    @dbCommit
+    def allowTrackbacks(self, allow=None):
+        if allow is None:
+            return self.currentPost.allowPings
+        if allow:
+            self.currentPost.allowPings = True
+        else:
+            self.currentPost.allowPings = False
+    
+    @dbCommit
+    def allowComments(self, allow=None):
+        if allow is None:
+            return self.currentPost.allowComments
+        if allow:
+            self.currentPost.allowComments = True
+        else:
+            self.currentPost.allowComments = False
+    
+    
 blogManager = BlogManager()
 def getBlogManager():
     return blogManager

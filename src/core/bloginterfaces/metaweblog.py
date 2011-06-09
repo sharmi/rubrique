@@ -60,7 +60,7 @@ import mimetypes
 from blog import Blog as MetaWeblogBlog
 from blog import User as MetaWeblogUser
 from blog import Category as MetaWeblogCategory
-from blog import Post as MetaWeblogPost
+from blog import LocalPost as MetaWeblogPost
 class MetaWeblogException(exceptions.Exception):
     """Custom exception for MetaWeblog client operations
     """

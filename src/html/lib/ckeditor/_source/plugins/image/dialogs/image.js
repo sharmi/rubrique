@@ -1156,7 +1156,7 @@ For licensing, see LICENSE.html or http://ckeditor.com/license
 				},
 				{
 					id : 'Upload',
-					hidden : true,
+					hidden : false,
 					filebrowser : 'uploadButton',
 					label : editor.lang.image.upload,
 					elements :

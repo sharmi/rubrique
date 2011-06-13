@@ -32,6 +32,7 @@ class BlogManager(object):
         self.posts = OnlinePost  #
         self.localposts = LocalPost
         self.categories = Category
+        self.currentApi = None
         self.appStatus = self.db.store
         try:
             if self.appStatus.currentBlog:
@@ -41,15 +42,21 @@ class BlogManager(object):
         try:
             self.currentPost = self.appStatus.currentPost
         except pod.db.PodStoreError:
-            print "no current post"
-            self.currentPost = LocalPost()
-            self.appStatus.currentPost = self.currentPost
+            self.setCurrentPost()
         print "here"
         log.info("Current Post")
         log.info(self.currentPost)
         self.db.commit()
 
-     
+    def dbCommit(f):
+        def funcDBCommit(*args):
+            returnVal = f(*args)
+            args[0].db.commit()
+            return returnVal
+        funcDBCommit.__name__ = f.__name__
+        return funcDBCommit
+
+
         
     def __setupDataPath(self):
         if platform.system() == "Linux":
@@ -102,14 +109,24 @@ class BlogManager(object):
     def _serviceApiForAcc(self, blogacc):
         return self._serviceApiFactory(blogacc.resolved, blogacc.apiurl, blogacc.username, blogacc.password)
 
+    @dbCommit
     def addBlog(self, blogacc):
         if blogacc:
             RubriqueBlogAccountPOD(blogacc)
             self.db.commit()
         pass
 
+    @dbCommit
+    def setCurrentPost(self, post=None):
+        if post is None:
+            self.currentPost = LocalPost()
+        else:
+            self.currentPost = post
+        self.appStatus.currentPost = self.currentPost
+
     def getBlogByKey(self, key):
         return (self.blogs.where.rubriqueKey == key).get_one()
+
 
     def setCurrentBlog(self, rubriqueKey):
         self.currentBlog = self.getBlogByKey(rubriqueKey)
@@ -125,33 +142,38 @@ class BlogManager(object):
         #if rubriqueKey not in self.categories:
         #    self.categories[rubriqueKey] = SQLiteShelf(self.dbpath, "categories_"+rubriqueKey)
 
-    def get_latest_posts(self, num=10):
-        return self.currentBlog.getRecentPosts(num)
+    def getLatestPosts(self, num=10):
+        if self.currentApi:
+            return self.currentApi.getPosts(num)
+        else:
+            return []
         
-    def publish(self):
-        self.currentApi.publishPost(self.currentPost)
+    def getCategories(self):
+        if self.currentApi:
+            return self.currentApi.getCategories()
+        else:
+            return []
 
-    def dbCommit(f):
-        def funcDBCommit(*args):
-            returnVal = f(*args)
-            args[0].db.commit()
-            return returnVal
-        funcDBCommit.__name__ = f.__name__
-        return funcDBCommit
+    def publish(self):
+        if self.currentApi:
+            self.currentApi.publishPost(self.currentPost)
+        else:
+            return None
 
     @dbCommit
     def setPostBody(self, content):
         self.currentPost.description = content
 
+    def getPostBody(self):
+        return self.currentPost.description
+
     @dbCommit
     def setTitle(self, title):
         self.currentPost.title = title
 
-    @dbCommit
     def getTitle(self):
         return self.currentPost.title
 
-    @dbCommit
     def getExcerpt(self):
         return self.currentPost.excerpt
 

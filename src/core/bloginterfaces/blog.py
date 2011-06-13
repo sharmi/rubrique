@@ -70,7 +70,7 @@ class Category(pod.Object):
         pod.Object.__init__(self)
         self.name = ''
         self.catId = ''
-        self.blogId = ''
+        self.blog = ''
         self.parentId= ''
         self.isPrimary = False
 
@@ -100,10 +100,11 @@ class OnlinePost(pod.Object):
         return "\n".join(to_return)
 
 
-class Post(pod.Object):
+class LocalPost(pod.Object):
     def __init__(self):
         pod.Object.__init__(self)
-        self.title = ''
+        self.postid = ''
+        self.title = '(Untitled Post)'
         self.date = None
         self.permaLink = ''
         self.description = ''
@@ -117,18 +118,15 @@ class Post(pod.Object):
         self.allowComments = False
         self.status = ''
 
-    def __str__(self):
+    def __repr__(self):
         to_return = []
         for item, value in self.__dict__.iteritems():
             to_return.append("%s: %s" %(item, value))
         return "\n".join(to_return)
 
+    def __str__(self):
+        return str(self.title)
 
-class LocalPost(Post):
-    pass
-
-class OnlinePost(Post):
-    pass
 
 
 #class RubriqueAppStatus(pod.Object):

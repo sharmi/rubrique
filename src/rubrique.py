@@ -8,7 +8,7 @@ from glob import glob
 from PyQt4 import QtGui, QtCore
 from ui.rubrique_ui import Ui_MainWindow
 from PyQt4.QtCore import QObject,  Qt, QCoreApplication, QEvent, QFile, QFileInfo, QIODevice, QLatin1Char, QLatin1String, QPoint, QRegExp, QString, QStringList, QTimer, QUrl
-from PyQt4.QtGui import QWidget,  QComboBox, QSizePolicy,  QIcon,  QLabel,  QSlider, QApplication, QColorDialog, QDesktopServices, QDialog, QFileDialog, QFontDatabase, QInputDialog, QMainWindow, QMessageBox, QMouseEvent, QStyleFactory, QTreeWidgetItem, QWhatsThis
+from PyQt4.QtGui import QWidget,  QComboBox, QSizePolicy,  QIcon,  QLabel,  QSlider, QApplication, QColorDialog, QDesktopServices, QDialog, QFileDialog, QFontDatabase, QInputDialog, QMainWindow, QMessageBox, QMouseEvent, QStyleFactory, QTreeWidgetItem, QWhatsThis, QStandardItemModel, QStandardItem, QListWidgetItem
 from PyQt4.QtWebKit import QWebPage, QWebView, QWebSettings
 from core.blogmanager import getBlogManager
 import calendar
@@ -39,6 +39,12 @@ log.addHandler(h2)
 def alert(msg):
     msgbox = QMessageBox('debugmsg', msg)
     msgbox.exec_()
+
+class QPostItem(QListWidgetItem):
+    def __init__(self, *args, **kwargs):
+        QStandardItem.__init__(self, *args, **kwargs)
+        self.post = None
+
 
 class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -93,8 +99,6 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         
         self.editView.setFocus();
     
-        self.setCurrentFileName(QString());
-    
         #codedir = os.path.dirname( os.path.realpath( __file__ ) )
         codedir = determine_path()
         self.visualViewSrc = urlunsplit(('file', '', os.path.join(codedir, 'html', 'editor.html'), '', ''))
@@ -125,17 +129,16 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         connect(self.zoomSlider, SIGNAL("valueChanged(int)"), self.changeZoom);
         connect(self.actionPublish,  SIGNAL("triggered()"), self.publish)
         connect(self.actionFileNew, SIGNAL("triggered()"), self.fileNew);
-        connect(self.actionFileOpen, SIGNAL("triggered()"), self.fileOpen);
-        connect(self.actionFileSave, SIGNAL("triggered()"), self.fileSave);
-        connect(self.actionFileSaveAs, SIGNAL("triggered()"), self.fileSaveAs);
+        connect(self.actionFileSave, SIGNAL("triggered()"), self.saveBlogContent);
         connect(self.actionExit, SIGNAL("triggered()"), self.close);
         connect(self.actionZoomOut, SIGNAL("triggered()"), self.zoomOut);
         connect(self.actionZoomIn, SIGNAL("triggered()"), self.zoomIn);
         connect(self.actionAddNewBlog, SIGNAL("triggered()"), self.addNewBlog)     
-        connect(self.postTitleTxt, SIGNAL("textEdited(QString)"), self.blogManager.setTitle) 
+        connect(self.postTitleTxt, SIGNAL("textEdited(QString)"), self.titleChanged) 
         connect(self.excerptTxt, SIGNAL("textChanged()"), self.setExcerpt)
         connect(self.trackbacksCheck, SIGNAL("stateChanged(int)"), self.blogManager.allowTrackbacks)
         connect(self.commentsCheck, SIGNAL("stateChanged(int)"), self.blogManager.allowComments)
+        connect(self.localpostsList, SIGNAL("itemActivated(QListWidgetItem *)"), self.loadLocalPost)
         # Qt 4.5.0 has a bug: always returns 0 for QWebPage.SelectAll
         
     
@@ -151,13 +154,40 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
 
     def setExcerpt(self):
         self.blogManager.setExcerpt(self.excerptTxt.toPlainText())
+    def loadLocalPost(self, postitem):
+        self.saveBlogContent()
+        self.blogManager.setCurrentPost(postitem.post)
+        self.initUIData()
+
+    def titleChanged(self, title):
+        self.blogManager.setTitle(title)
+        self.setWindowTitle(self.tr("%1[*] - %2").arg(title).arg(self.tr(self.windowTitle)));
+        #self.setWindowModified(False);
+        #TODO also change in localPostsList
+
+    def setLocalPostsList(self):
+        #model = QStandardItemModel()
+        #count = 0
+        for post in self.blogManager.localposts:
+            postitem = QPostItem(str(post))
+            postitem.post = post
+            self.localpostsList.addItem(postitem)
+            #count =+ 1
+        #self.localpostsList.setModel(model)
 
     def initUIData(self):
-        print self.blogManager.getTitle(), self.blogManager.getExcerpt()
-        self.postTitleTxt.setText(self.blogManager.getTitle())
+        title = self.blogManager.getTitle()
+        self.setWindowTitle(self.tr("%1[*] - %2").arg(title).arg(self.tr(self.windowTitle)));
+        self.postTitleTxt.setText(title)
         self.excerptTxt.setPlainText(self.blogManager.getExcerpt())
         self.trackbacksCheck.setChecked(self.blogManager.allowTrackbacks())
         self.commentsCheck.setChecked(self.blogManager.allowComments())
+        self.setLocalPostsList()
+        postBody = self.blogManager.getPostBody()
+        self.setCodeData(postBody)
+        self.setEditData(postBody)
+        self.preView.setHtml(postBody)
+
     def syncEditors(self,  force=False):
         #0 -> EditView 1->CodeView 2->Preview
         currentIndex =  self.tabWidget.currentIndex()
@@ -196,10 +226,66 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         self.populateComboSelector()
         self.initUIData()
         #self.blogManager.add_blog('wordpress', 'http://www.minvolai.com/blog/xmlrpc.php', 'sharmila', 'letmein')
-        #self.populatePosts()
-    
+        self.populatePosts()
+        self.populateCategories()
+
+    def _addChildren(self, parent, parentitem, parent_child_dict):
+        if parent.catId not in parent_child_dict:
+            return
+        for child in parent_child_dict[parent.catId]:
+            catitem = QTreeWidgetItem(parentitem)
+            self._addChildren(child, catitem, parent_child_dict)
+            catitem.setFlags(Qt.ItemIsSelectable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsDragEnabled)
+            catitem.setCheckState(0, Qt.Checked)
+            #catitem.setIcon(0, blueico)
+            catitem.setText(0, child.name)
+            catitem.setToolTip(0, child.description)
+        
+    def populateCategories(self):
+        categories = self.blogManager.getCategories()
+        if not categories:
+            self.categoriestree.clear()
+            return
+        self.categoriestree.setColumnCount(1)
+        parent_child_dict = {}
+        for cat in categories:
+            if cat.parentId not in parent_child_dict:
+                parent_child_dict[cat.parentId] = []
+            parent_child_dict[cat.parentId].append(cat)
+        cat_item_mapping = {}
+        for child in parent_child_dict['0']:
+            catitem = QTreeWidgetItem(self.categoriestree)
+            self._addChildren(child, catitem, parent_child_dict)
+
+            #catitem.setIcon(0, blueico)
+            catitem.setText(0, child.name)
+            catitem.setFlags(Qt.ItemIsSelectable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsDragEnabled)
+            catitem.setCheckState(0, Qt.Unchecked)
+            catitem.setToolTip(0, child.description)
+        """
+        for post in posts:
+            year, month = post.date[:2]
+            if year not in yeardict:
+                yeartree = QTreeWidgetItem(self.postTree)
+                yeartree.setIcon(0,  blueico)
+                yeartree.setText(0, str(year))
+                yeardict[year] = yeartree
+            if (year, month) not in year_month:
+                monthtree = QTreeWidgetItem(yeardict[year])
+                monthtree.setIcon(0,  blueico)
+                monthtree.setText(0, calendar.month_name[month])
+                year_month[(year, month)] = monthtree
+                
+            postobj = QTreeWidgetItem(year_month[(year, month)])
+            postobj.setIcon(0,  postico)
+            postobj.setText(0, post.title)
+            postobj.setToolTip(0,  post.title + "\n Sharmi")
+        """
     def populatePosts(self):
-        posts = self.blogManager.get_latest_posts()
+        posts = self.blogManager.getLatestPosts()
+        if not posts:
+            self.postTree.clear()
+            return
         yeardict = {}
         year_month = {}
         self.postTree.setColumnCount(1)
@@ -257,63 +343,11 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         return True;
 
     def fileNew(self):
-
-        if self.maybeSave():
-            self.editView.setHtml("<p></p>");
-            self.editView.setFocus();
-            self.editView.page().setContentEditable(False);
-            self.setCurrentFileName(QString());
-            self.setWindowModified(False);
+        self.saveBlogContent()
+        self.blogManager.setCurrentPost()
+        self.initUIData()
     
-            # quirk in QeditView: need an initial mouse click to show the cursor
-            mx = self.editView.width() / 2;
-            my = self.editView.height() / 2;
-            center = QPoint(mx, my);
-            e1 = QMouseEvent(QEvent.MouseButtonPress, center,
-                                              Qt.LeftButton, Qt.LeftButton,
-                                              Qt.NoModifier);
-            e2 = QMouseEvent(QEvent.MouseButtonRelease, center,
-                                              Qt.LeftButton, Qt.LeftButton,
-                                              Qt.NoModifier);
-            QApplication.postEvent(self.editView, e1);
-            QApplication.postEvent(self.editView, e2);
-
-    def fileOpen(self):
-            fn = QFileDialog.getOpenFileName(self, self.tr("Open File..."),
-                 QString(), self.tr("HTML-Files (*.htm *.html);;All Files (*)"));
-            if not fn.isEmpty():
-                self.load(fn);
-
-
-    def fileSave(self):
-        if not fileName or fileName.startsWith(QLatin1String(":/")):
-                return self.fileSaveAs();
-
-        fileobj = QFile(fileName);
-        success = fileobj.open(QIODevice.WriteOnly);
-        if success:
-            # FIXME: here we always use UTF-8 encoding
-            content = self.editView.page().mainFrame().toHtml();
-            data = content.toUtf8();
-            c = fileobj.write(data);
-            success = (c >= data.length());
     
-        self.setWindowModified(False);
-        return success;
-
-
-    def fileSaveAs(self):
-
-        fn = QFileDialog.getSaveFileName(self, self.tr("Save as..."),
-                     QString(), self.tr("HTML-Files (*.htm *.html);;All Files (*)"));
-        if fn.isEmpty():
-            return False;
-        if not (fn.endsWith(".htm", Qt.CaseInsensitive) or fn.endsWith(".html", Qt.CaseInsensitive)):
-            fn += ".htm"; # default
-        self.setCurrentFileName(fn);
-        return self.fileSave();
-
-
 # shamelessly copied from Qt Demo Browser
     def guessUrlFromString(self,  urlStr):
 
@@ -513,8 +547,8 @@ def main():
     #QtGui.QApplication.setStyle(QtGui.QStyleFactory.create("Cleanlooks"))
     #font = QtGui.QFont("Cardo")
     font = QtGui.QFont('Mukthi Narrow', 10)
-    font = QtGui.QFont('Bienetresocial', 10)
-    app.setFont(font)
+    #font = QtGui.QFont('Bienetresocial', 10)
+    #app.setFont(font)
     QtGui.QApplication.setPalette(QtGui.QApplication.style().standardPalette())
 
     window = Rubrique()

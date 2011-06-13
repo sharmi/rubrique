@@ -7,7 +7,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1219</width>
+    <width>1223</width>
     <height>600</height>
    </rect>
   </property>
@@ -95,6 +95,9 @@
            </attribute>
            <layout class="QVBoxLayout" name="verticalLayout_3">
             <item>
+             <widget class="QComboBox" name="comboBox_2"/>
+            </item>
+            <item>
              <widget class="QTreeWidget" name="postTree">
               <attribute name="headerVisible">
                <bool>false</bool>
@@ -121,6 +124,16 @@
          </widget>
         </item>
         <item>
+         <widget class="QLabel" name="label">
+          <property name="text">
+           <string>Post Belongs to:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="comboBox"/>
+        </item>
+        <item>
          <widget class="QToolBox" name="toolBox">
           <property name="minimumSize">
            <size>
@@ -141,7 +154,7 @@
            <enum>QFrame::Raised</enum>
           </property>
           <property name="currentIndex">
-           <number>3</number>
+           <number>0</number>
           </property>
           <widget class="QWidget" name="tb_categories">
            <property name="geometry">
@@ -149,7 +162,7 @@
              <x>0</x>
              <y>0</y>
              <width>230</width>
-             <height>172</height>
+             <height>130</height>
             </rect>
            </property>
            <attribute name="label">
@@ -188,7 +201,7 @@
              <x>0</x>
              <y>0</y>
              <width>230</width>
-             <height>172</height>
+             <height>130</height>
             </rect>
            </property>
            <attribute name="label">
@@ -218,7 +231,7 @@
              <x>0</x>
              <y>0</y>
              <width>230</width>
-             <height>128</height>
+             <height>85</height>
             </rect>
            </property>
            <attribute name="label">
@@ -259,7 +272,7 @@
              <x>0</x>
              <y>0</y>
              <width>230</width>
-             <height>172</height>
+             <height>130</height>
             </rect>
            </property>
            <attribute name="label">
@@ -425,7 +438,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1219</width>
+     <width>1223</width>
      <height>25</height>
     </rect>
    </property>
@@ -470,7 +483,6 @@
     <bool>false</bool>
    </attribute>
    <addaction name="actionFileNew"/>
-   <addaction name="actionFileOpen"/>
    <addaction name="actionFileSave"/>
    <addaction name="separator"/>
    <addaction name="actionAddNewBlog"/>

@@ -60,7 +60,7 @@ import mimetypes
 from blog import Blog as MetaWeblogBlog
 from blog import User as MetaWeblogUser
 from blog import Category as MetaWeblogCategory
-from blog import LocalPost as MetaWeblogPost
+from blog import OnlinePost as MetaWeblogPost
 class MetaWeblogException(exceptions.Exception):
     """Custom exception for MetaWeblog client operations
     """
@@ -101,7 +101,7 @@ class MetaWeblogClient:
         postObj.link             = post['link']
         postObj.textMore         = post['mt_text_more']
         postObj.allowComments     = post['mt_allow_comments'] == 1
-        postObj.id                 = int(post['postid'])
+        postObj.postid                 = int(post['postid'])
         postObj.categories         = post['categories']
         postObj.allowPings         = post['mt_allow_pings'] == 1
         postObj.status         = post['post_status']
@@ -110,9 +110,12 @@ class MetaWeblogClient:
     def _filterCategory(self, cat):
         """Transform category struct in MetaWeblogCategory instance
         """
+        #{'description': 'External Libraries', 'htmlUrl': 'http://scrolls.com/wordpress/blog/category/python/external-libraries/', 'categoryDescription': 'As easy as they can be!', 'parentId': '3', 'rssUrl': 'http://scrolls.com/wordpress/blog/category/python/external-libraries/feed/', 'categoryId': '5', 'categoryName': 'External Libraries'}
         catObj = MetaWeblogCategory()
-        catObj.id             = int(cat['categoryId'])
+        catObj.catId             = cat['categoryId']
         catObj.name         = cat['categoryName'] 
+        catObj.parentId = cat['parentId']
+        catObj.description = cat['categoryDescription']
         if cat.has_key('isPrimary'):
             catObj.isPrimary     = cat['isPrimary']
         return catObj
@@ -283,7 +286,7 @@ class MetaWeblogClient:
         try:
             if not self.categories:
                 self.categories = []
-                categories = self._server.mt.getCategoryList(self.blogId, 
+                categories = self._server.metaWeblog.getCategories(self.blogId, 
                                                 self.user, self.password)                
                 for cat in categories:
                     self.categories.append(self._filterCategory(cat))    
@@ -297,7 +300,7 @@ class MetaWeblogClient:
         """
         for c in self.getCategoryList():
             if c.name == name:
-                return c.id
+                return c.postid
         
     def getTrackbackPings(self, postId):
         """Get trackback pings of post

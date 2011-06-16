@@ -9,10 +9,10 @@ from chooseblogdialog import ChooseBlogDialog
 log = logging.getLogger("rubrique")
 connect = QObject.connect
 class AddBlogDialog(QDialog, Ui_AddBlogDialog):
-    def __init__(self):
+    def __init__(self, callback):
         QDialog.__init__(self)
         Ui_AddBlogDialog.__init__(self)
-
+        self.callback = callback
         self.setupUi(self)
         connect(self.addBlogButtonBox, SIGNAL("accepted()"), self.verifyAndAddBlog) #AddBlogDialog.accept)
         connect(self.addBlogButtonBox, SIGNAL("rejected()"), self.reject)#AddBlogDialog.reject)
@@ -39,7 +39,7 @@ class AddBlogDialog(QDialog, Ui_AddBlogDialog):
     
     def addToDB(self, blog):
         self.blogManager.addBlog(blog)
-        self.blogManager.setCurrentBlog(blog.rubriqueKey)
+        #self.blogManager.setCurrentBlog(blog.rubriqueKey)
         title = "Added New Blog: %s"% blog.blogname 
         message = "The blog with the following details have been added to the repository.\n Blog Name: %s\nUsername: %s\nUrl: %s\nBlog Engine: %s" %(blog.blogname, blog.username, blog.homeurl, blog.apis[blog.preferred]['name']) 
         QMessageBox.information(self, title, message, QMessageBox.Ok, QMessageBox.Ok) 
@@ -60,12 +60,12 @@ class AddBlogDialog(QDialog, Ui_AddBlogDialog):
         try:
             available_blogs = self.blogManager.getBlogs(url, username, password)
             if len(available_blogs) > 1:
-                choose_blog_dialog = ChooseBlogDialog(available_blogs, self.addToDB)
+                choose_blog_dialog = ChooseBlogDialog(available_blogs, self.callback)
                 if choose_blog_dialog.exec_():
                     self.accept()
 
             elif len(available_blogs) == 1:
-                self.addToDB(available_blogs[0])
+                self.callback(available_blogs[0])
 
             #self.blogManager.set_current_blog(newblog.rubriqueKey)
                 self.accept()
@@ -98,10 +98,10 @@ class AddBlogDialog(QDialog, Ui_AddBlogDialog):
             return True
 
 addBlogDialog = None
-def addNewBlog():
+def addNewBlog(callback):
     global addBlogDialog
     if not addBlogDialog:
-        addBlogDialog = AddBlogDialog()
+        addBlogDialog = AddBlogDialog(callback)
     if addBlogDialog.exec_():
         return True
     else:

@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'qt_resources/rubrique.ui'
 #
-# Created: Thu Jun  9 10:18:05 2011
+# Created: Mon Jun 13 15:22:55 2011
 #      by: PyQt4 UI code generator 4.8.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -17,7 +17,7 @@ except AttributeError:
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName(_fromUtf8("MainWindow"))
-        MainWindow.resize(1219, 600)
+        MainWindow.resize(1223, 600)
         MainWindow.setAcceptDrops(True)
         icon = QtGui.QIcon()
         icon.addPixmap(QtGui.QPixmap(_fromUtf8(":/myimages/publishstamp.png")), QtGui.QIcon.Normal, QtGui.QIcon.Off)
@@ -54,6 +54,9 @@ class Ui_MainWindow(object):
         self.blogposts.setObjectName(_fromUtf8("blogposts"))
         self.verticalLayout_3 = QtGui.QVBoxLayout(self.blogposts)
         self.verticalLayout_3.setObjectName(_fromUtf8("verticalLayout_3"))
+        self.blogCombo = QtGui.QComboBox(self.blogposts)
+        self.blogCombo.setObjectName(_fromUtf8("blogCombo"))
+        self.verticalLayout_3.addWidget(self.blogCombo)
         self.postTree = QtGui.QTreeWidget(self.blogposts)
         self.postTree.setObjectName(_fromUtf8("postTree"))
         self.postTree.headerItem().setText(0, _fromUtf8("Posts"))
@@ -69,6 +72,12 @@ class Ui_MainWindow(object):
         self.verticalLayout_4.addWidget(self.localpostsList)
         self.blogrel.addTab(self.localpostsBgWidget, _fromUtf8(""))
         self.verticalLayout.addWidget(self.blogrel)
+        self.postBlogLabel = QtGui.QLabel(self.leftpane)
+        self.postBlogLabel.setObjectName(_fromUtf8("postBlogLabel"))
+        self.verticalLayout.addWidget(self.postBlogLabel)
+        self.postBlogCombo = QtGui.QComboBox(self.leftpane)
+        self.postBlogCombo.setObjectName(_fromUtf8("postBlogCombo"))
+        self.verticalLayout.addWidget(self.postBlogCombo)
         self.toolBox = QtGui.QToolBox(self.leftpane)
         self.toolBox.setMinimumSize(QtCore.QSize(200, 0))
         self.toolBox.setMaximumSize(QtCore.QSize(300, 16777215))
@@ -76,7 +85,7 @@ class Ui_MainWindow(object):
         self.toolBox.setFrameShadow(QtGui.QFrame.Raised)
         self.toolBox.setObjectName(_fromUtf8("toolBox"))
         self.tb_categories = QtGui.QWidget()
-        self.tb_categories.setGeometry(QtCore.QRect(0, 0, 230, 172))
+        self.tb_categories.setGeometry(QtCore.QRect(0, 0, 230, 130))
         self.tb_categories.setObjectName(_fromUtf8("tb_categories"))
         self.horizontalLayout = QtGui.QHBoxLayout(self.tb_categories)
         self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
@@ -95,7 +104,7 @@ class Ui_MainWindow(object):
         self.horizontalLayout.addWidget(self.widget)
         self.toolBox.addItem(self.tb_categories, _fromUtf8(""))
         self.tb_tags = QtGui.QWidget()
-        self.tb_tags.setGeometry(QtCore.QRect(0, 0, 230, 172))
+        self.tb_tags.setGeometry(QtCore.QRect(0, 0, 230, 130))
         self.tb_tags.setObjectName(_fromUtf8("tb_tags"))
         self.verticalLayout_7 = QtGui.QVBoxLayout(self.tb_tags)
         self.verticalLayout_7.setObjectName(_fromUtf8("verticalLayout_7"))
@@ -112,7 +121,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_7.addWidget(self.widget_2)
         self.toolBox.addItem(self.tb_tags, _fromUtf8(""))
         self.tb_options = QtGui.QWidget()
-        self.tb_options.setGeometry(QtCore.QRect(0, 0, 230, 128))
+        self.tb_options.setGeometry(QtCore.QRect(0, 0, 230, 85))
         self.tb_options.setObjectName(_fromUtf8("tb_options"))
         self.gridLayout = QtGui.QGridLayout(self.tb_options)
         self.gridLayout.setObjectName(_fromUtf8("gridLayout"))
@@ -131,7 +140,7 @@ class Ui_MainWindow(object):
         self.gridLayout.addWidget(self.frame_2, 0, 0, 1, 1)
         self.toolBox.addItem(self.tb_options, _fromUtf8(""))
         self.tb_excerpt = QtGui.QWidget()
-        self.tb_excerpt.setGeometry(QtCore.QRect(0, 0, 230, 172))
+        self.tb_excerpt.setGeometry(QtCore.QRect(0, 0, 230, 130))
         self.tb_excerpt.setObjectName(_fromUtf8("tb_excerpt"))
         self.verticalLayout_11 = QtGui.QVBoxLayout(self.tb_excerpt)
         self.verticalLayout_11.setObjectName(_fromUtf8("verticalLayout_11"))
@@ -210,7 +219,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_9.addWidget(self.splitter)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtGui.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1219, 25))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1223, 25))
         self.menubar.setObjectName(_fromUtf8("menubar"))
         self.menuB_log = QtGui.QMenu(self.menubar)
         self.menuB_log.setObjectName(_fromUtf8("menuB_log"))
@@ -291,7 +300,6 @@ class Ui_MainWindow(object):
         self.menubar.addAction(self.menu_Edit.menuAction())
         self.menubar.addAction(self.menuB_log.menuAction())
         self.standardToolBar.addAction(self.actionFileNew)
-        self.standardToolBar.addAction(self.actionFileOpen)
         self.standardToolBar.addAction(self.actionFileSave)
         self.standardToolBar.addSeparator()
         self.standardToolBar.addAction(self.actionAddNewBlog)
@@ -305,7 +313,7 @@ class Ui_MainWindow(object):
 
         self.retranslateUi(MainWindow)
         self.blogrel.setCurrentIndex(0)
-        self.toolBox.setCurrentIndex(3)
+        self.toolBox.setCurrentIndex(0)
         self.tabWidget.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
@@ -314,6 +322,7 @@ class Ui_MainWindow(object):
         self.blogposts.setAccessibleName(QtGui.QApplication.translate("MainWindow", "Categories", None, QtGui.QApplication.UnicodeUTF8))
         self.blogrel.setTabText(self.blogrel.indexOf(self.blogposts), QtGui.QApplication.translate("MainWindow", "Blog Posts", None, QtGui.QApplication.UnicodeUTF8))
         self.blogrel.setTabText(self.blogrel.indexOf(self.localpostsBgWidget), QtGui.QApplication.translate("MainWindow", "Local Posts", None, QtGui.QApplication.UnicodeUTF8))
+        self.postBlogLabel.setText(QtGui.QApplication.translate("MainWindow", "Post Belongs to:", None, QtGui.QApplication.UnicodeUTF8))
         self.toolBox.setItemText(self.toolBox.indexOf(self.tb_categories), QtGui.QApplication.translate("MainWindow", "Categories", None, QtGui.QApplication.UnicodeUTF8))
         self.toolBox.setItemText(self.toolBox.indexOf(self.tb_tags), QtGui.QApplication.translate("MainWindow", "Tags", None, QtGui.QApplication.UnicodeUTF8))
         self.trackbacksCheck.setText(QtGui.QApplication.translate("MainWindow", "Allow Trackbacks", None, QtGui.QApplication.UnicodeUTF8))

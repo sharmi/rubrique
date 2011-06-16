@@ -3,14 +3,15 @@
 
 import os
 import sys
+import json
 from urlparse import urlunsplit
 from glob import glob 
 from PyQt4 import QtGui, QtCore
 from ui.rubrique_ui import Ui_MainWindow
 from PyQt4.QtCore import QObject,  Qt, QCoreApplication, QEvent, QFile, QFileInfo, QIODevice, QLatin1Char, QLatin1String, QPoint, QRegExp, QString, QStringList, QTimer, QUrl
-from PyQt4.QtGui import QWidget,  QComboBox, QSizePolicy,  QIcon,  QLabel,  QSlider, QApplication, QColorDialog, QDesktopServices, QDialog, QFileDialog, QFontDatabase, QInputDialog, QMainWindow, QMessageBox, QMouseEvent, QStyleFactory, QTreeWidgetItem, QWhatsThis, QStandardItemModel, QStandardItem, QListWidgetItem
+from PyQt4.QtGui import QWidget,  QComboBox, QSizePolicy,  QIcon,  QLabel,  QSlider, QApplication, QColorDialog, QDesktopServices, QDialog, QFileDialog, QFontDatabase, QInputDialog, QMainWindow, QMessageBox, QMouseEvent, QStyleFactory, QTreeWidgetItem, QWhatsThis, QStandardItemModel, QStandardItem, QListWidgetItem, QAction
 from PyQt4.QtWebKit import QWebPage, QWebView, QWebSettings
-from core.blogmanager import getBlogManager
+from core.blogmanager import getBlogManager, RubriqueBlogCommError, RubriqueBlogSetupError
 import calendar
 from xml.sax.saxutils import quoteattr
 import addblogdialog 
@@ -34,6 +35,12 @@ h1.setLevel(logging.DEBUG)
 h2.setLevel(logging.DEBUG)
 log.addHandler(h1)
 log.addHandler(h2)
+
+
+def showErrorMessage(msg):
+    title = "An Error has occurred"
+    message = "An error was encountered.  The message is as follows.\n" + msg
+    QMessageBox.information(self, title, message, QMessageBox.Ok, QMessageBox.Ok) 
 
 #self.tr = QObject.self.tr
 def alert(msg):
@@ -68,14 +75,14 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         #self.spacer = QWidget(self);
         #self.spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum);
         #self.standardToolBar.insertWidget(self.actionZoomOut, self.spacer);
-        self.labelSelector=QLabel("Current Blog: ", self.standardToolBar)
-        self.comboSelector=QComboBox(self.standardToolBar)
-        self.comboSelector.setEditable(False)
-        self.connect(self.comboSelector,
-                     SIGNAL("activated(int)"),
-                     self.slotCurrentBlogChanged)
-        self.standardToolBar.addWidget(self.labelSelector)
-        self.standardToolBar.addWidget(self.comboSelector)
+        #self.labelSelector=QLabel("Current Blog: ", self.standardToolBar)
+        #self.comboSelector=QComboBox(self.standardToolBar)
+        #self.comboSelector.setEditable(False)
+        #self.connect(self.comboSelector,
+        #             SIGNAL("activated(int)"),
+        #             self.slotCurrentBlogChanged)
+        #self.standardToolBar.addWidget(self.labelSelector)
+        #self.standardToolBar.addWidget(self.comboSelector)
 
         self.zoomLabel = QLabel();
         self.standardToolBar.insertWidget(self.actionZoomIn, self.zoomLabel);
@@ -92,10 +99,10 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         self.codeView.setHtml(open('html/codemirrorui.html').read())
         self.editView.page().setContentEditable(False);
         self.codeView.page().setContentEditable(False);
-
-        self.setupBlogData();
-
+        self.keyLocalPostItemMap = {}
         self.editor = 0;
+
+
         
         self.editView.setFocus();
     
@@ -120,12 +127,21 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         settings.setAttribute(QWebSettings.LocalContentCanAccessFileUrls, True)
         self.editView.load(QUrl(self.visualViewSrc))
         self.codeView.load(QUrl(self.htmlViewSrc))
+        connect(self.editView.page(), SIGNAL('loadFinished(bool)'), self.loadPostContent)
+        self.reloadFlag = True
+        #connect(self.codeView.page(), SIGNAL('loadFinished(bool)'), self.loadPostContent)
         self.adjustSource()
+        self.setupBlogData();
         self.setWindowModified(False)
         self.changeZoom(100)
         self.autosaveTimer = QTimer(self)
+        self.localpostsList.setContextMenuPolicy(Qt.ActionsContextMenu)
+        self.actionLocalPostOpen = QAction("Open", self.localpostsList)
+        self.actionLocalPostDelete = QAction("Delete", self.localpostsList)
+        self.localpostsList.addAction(self.actionLocalPostOpen)
+        self.localpostsList.addAction(self.actionLocalPostDelete)
         connect(self.autosaveTimer, SIGNAL("timeout()"), self.saveBlogContent)
-        self.autosaveTimer.start(2000)
+        #self.autosaveTimer.start(2000)
         connect(self.zoomSlider, SIGNAL("valueChanged(int)"), self.changeZoom);
         connect(self.actionPublish,  SIGNAL("triggered()"), self.publish)
         connect(self.actionFileNew, SIGNAL("triggered()"), self.fileNew);
@@ -133,12 +149,24 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         connect(self.actionExit, SIGNAL("triggered()"), self.close);
         connect(self.actionZoomOut, SIGNAL("triggered()"), self.zoomOut);
         connect(self.actionZoomIn, SIGNAL("triggered()"), self.zoomIn);
-        connect(self.actionAddNewBlog, SIGNAL("triggered()"), self.addNewBlog)     
+        connect(self.actionAddNewBlog, SIGNAL("triggered()"), self.addNewBlogDialog)     
         connect(self.postTitleTxt, SIGNAL("textEdited(QString)"), self.titleChanged) 
         connect(self.excerptTxt, SIGNAL("textChanged()"), self.setExcerpt)
         connect(self.trackbacksCheck, SIGNAL("stateChanged(int)"), self.blogManager.allowTrackbacks)
         connect(self.commentsCheck, SIGNAL("stateChanged(int)"), self.blogManager.allowComments)
         connect(self.localpostsList, SIGNAL("itemActivated(QListWidgetItem *)"), self.loadLocalPost)
+        connect(self.actionLocalPostOpen, SIGNAL("triggered()"), self.loadLocalPost)
+        connect(self.actionLocalPostDelete, SIGNAL("triggered()"), self.deleteLocalPost)
+        connect(self.categoriestree, SIGNAL("itemChanged (QTreeWidgetItem *,int)"), self.changeCategories)
+
+        self.connect(self.blogCombo,
+                     SIGNAL("currentIndexChanged(int)"),
+                     self.currentBlogChanged)
+        self.connect(self.postBlogCombo,
+                     SIGNAL("currentIndexChanged(int)"),
+                     self.currentPostBlogChanged)
+        self.connect(self.postTree, 
+                     SIGNAL("itemActivated(QTreeWidgetItem * , int)"), self.loadOnlinePost)
         # Qt 4.5.0 has a bug: always returns 0 for QWebPage.SelectAll
         
     
@@ -149,21 +177,71 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         connect(self.tabWidget,  SIGNAL("currentChanged(int)"),  self.syncEditors)
 
 
-    def slotCurrentBlogChanged(self):
+    def blogManagerErrorHandler(f):
+        def errorfunc(*args):
+            try:
+                return f(*args)
+            except RubriqueBlogCommError, e:
+                showErrorMessage(str(e))
+        return errorfunc
+
+    def changeCategories(self, item, column):
+        catname = unicode(item.text(0))
+        if item.checkState(0) == Qt.Checked:
+            self.blogManager.addCategory(catname)
+        else:
+            self.blogManager.removeCategory(catname)
+
+    def loadOnlinePost(self, postitem, column):
+        self.autosaveTimer.stop()
+        postid = int(postitem.data(0, Qt.UserRole).toInt()[0])
+        rubriqueKey = str(self.blogCombo.itemData(self.blogCombo.currentIndex()).toString())
+        self.saveBlogContent()
+        self.blogManager.loadOnlinePost (rubriqueKey, postid)
+        self.initUIData()
+        #self.autosaveTimer.start(5000)
+
+
+
+    @blogManagerErrorHandler
+    def currentBlogChanged(self, index):
+        self.postTree.clear()
+        self.populatePosts()
+        pass
+
+    @blogManagerErrorHandler
+    def currentPostBlogChanged(self, index):
+        self.categoriestree.clear()
+        rubriqueKey = str(self.postBlogCombo.itemData(index).toString())
+        self.blogManager.setCurrentBlog(rubriqueKey)
+        self.populateCategories()
         pass
 
     def setExcerpt(self):
-        self.blogManager.setExcerpt(self.excerptTxt.toPlainText())
-    def loadLocalPost(self, postitem):
+        self.blogManager.setExcerpt(unicode(self.excerptTxt.toPlainText()))
+
+    def loadLocalPost(self, postitem=None):
         self.saveBlogContent()
+        if postitem == None:
+            postitem = self.localpostsList.currentItem() 
         self.blogManager.setCurrentPost(postitem.post)
         self.initUIData()
+
+    def deleteLocalPost(self):
+        postitem = self.localpostsList.currentItem() 
+        if postitem.post is self.blogManager.currentPost:
+            self.fileNew()
+        self.blogManager.deleteLocalPost(postitem.post)
+        self.localpostsList.takeItem(self.localpostsList.currentRow())
+        del postitem
+
 
     def titleChanged(self, title):
         self.blogManager.setTitle(title)
         self.setWindowTitle(self.tr("%1[*] - %2").arg(title).arg(self.tr(self.windowTitle)));
+        self.keyLocalPostItemMap[self.blogManager.currentPost.id].setText(title)
         #self.setWindowModified(False);
-        #TODO also change in localPostsList
+        #TODO also change in localpostsList
 
     def setLocalPostsList(self):
         #model = QStandardItemModel()
@@ -172,23 +250,47 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
             postitem = QPostItem(str(post))
             postitem.post = post
             self.localpostsList.addItem(postitem)
+            self.keyLocalPostItemMap[post.id] = postitem
             #count =+ 1
         #self.localpostsList.setModel(model)
+    
+    def checkPostCategories(self):
+        categories = self.blogManager.currentPost.categories
+        for catitem in self.catItemsMap.values():
+            catitem.setCheckState(0, Qt.Unchecked)
+        for catname in categories:
+            self.catItemsMap[catname].setCheckState(0, Qt.Checked)
 
     def initUIData(self):
+        print self.blogManager.currentPost.categories
         title = self.blogManager.getTitle()
         self.setWindowTitle(self.tr("%1[*] - %2").arg(title).arg(self.tr(self.windowTitle)));
         self.postTitleTxt.setText(title)
         self.excerptTxt.setPlainText(self.blogManager.getExcerpt())
+        self.checkPostCategories()
         self.trackbacksCheck.setChecked(self.blogManager.allowTrackbacks())
         self.commentsCheck.setChecked(self.blogManager.allowComments())
         self.setLocalPostsList()
+        self.reloadFlag = True
+        self.codeView.reload()
+        self.editView.reload()
+
+
+    def loadPostContent(self, flag):
+        if not self.reloadFlag:
+            return
+        self.reloadFlag = False
+        print "called", self.reloadFlag
+        self.autosaveTimer.stop()
         postBody = self.blogManager.getPostBody()
-        self.setCodeData(postBody)
         self.setEditData(postBody)
+        self.setCodeData(postBody)
         self.preView.setHtml(postBody)
+        #self.autosaveTimer.start(2000)
+        
 
     def syncEditors(self,  force=False):
+        return True
         #0 -> EditView 1->CodeView 2->Preview
         currentIndex =  self.tabWidget.currentIndex()
         if currentIndex!= self.editor or force==True:
@@ -204,45 +306,65 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
                self.editor  = currentIndex
         return True
         
-    def populateComboSelector(self, blog=None):
+    def populateBlogCombos(self, blog=None):
         if blog:
-            self.comboSelector.addItem("%s: %s" %(blog.blogname, blog.username))
+            #self.comboSelector.addItem("%s: %s" %(blog.blogname, blog.username))
+            log.info('Adding new blog %s to both combos' %blog.rubriqueKey)
+            self.blogCombo.addItem("%s: %s" %(blog.blogname, blog.username), blog.rubriqueKey)
+            self.postBlogCombo.addItem("%s: %s" %(blog.blogname, blog.username), blog.rubriqueKey)
+            
             return
         for blog in self.blogManager.blogs:
             #blog = self.blogManager.blogs[rubrique_key]
-            self.comboSelector.addItem("%s: %s" %(blog.blogname, blog.username))
+            self.blogCombo.addItem("%s: %s" %(blog.blogname, blog.username), blog.rubriqueKey)
+            self.postBlogCombo.addItem("%s: %s" %(blog.blogname, blog.username), blog.rubriqueKey)
+            rubriqueKey = self.blogManager.currentBlog.rubriqueKey
+            index = self.blogCombo.findData(rubriqueKey)
+            self.blogCombo.setCurrentIndex(index)
+            index = self.postBlogCombo.findData(rubriqueKey)
+            self.postBlogCombo.setCurrentIndex(index)
         return
     
-    def addNewBlog(self):
-        newblog = addblogdialog.addNewBlog()
+    def addNewBlog(self, blog):
+        addedBlog = self.blogManager.addBlog(blog)
+        self.populateBlogCombos(addedBlog)
+        index = self.blogCombo.findData(addedBlog.rubriqueKey)
+        self.blogCombo.setCurrentIndex(index)
+        #self.blogManager.setCurrentBlog(blog.rubriqueKey)
+        title = "Added New Blog: %s"% blog.blogname 
+        message = "The blog with the following details have been added to the repository.\n Blog Name: %s\nUsername: %s\nUrl: %s\nBlog Engine: %s" %(blog.blogname, blog.username, blog.homeurl, blog.apis[blog.preferred]['name']) 
+        QMessageBox.information(self, title, message, QMessageBox.Ok, QMessageBox.Ok) 
+
+    def addNewBlogDialog(self):
+        newblog = addblogdialog.addNewBlog(self.addNewBlog)
         if not newblog: return
-        self.populateComboSelector(self.blogManager.currentBlog)
         #self.blogManager.set_current_blog(newblog.rubrique_key)
         
     def donothing(self):
         pass
     def setupBlogData(self):
         self.blogManager = getBlogManager()
-        self.populateComboSelector()
-        self.initUIData()
-        #self.blogManager.add_blog('wordpress', 'http://www.minvolai.com/blog/xmlrpc.php', 'sharmila', 'letmein')
+        self.populateBlogCombos()
         self.populatePosts()
         self.populateCategories()
+        self.initUIData()
+        #self.blogManager.add_blog('wordpress', 'http://www.minvolai.com/blog/xmlrpc.php', 'sharmila', 'letmein')
 
     def _addChildren(self, parent, parentitem, parent_child_dict):
         if parent.catId not in parent_child_dict:
             return
         for child in parent_child_dict[parent.catId]:
             catitem = QTreeWidgetItem(parentitem)
+            self.catItemsMap[child.name] = catitem
             self._addChildren(child, catitem, parent_child_dict)
             catitem.setFlags(Qt.ItemIsSelectable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsDragEnabled)
-            catitem.setCheckState(0, Qt.Checked)
             #catitem.setIcon(0, blueico)
             catitem.setText(0, child.name)
             catitem.setToolTip(0, child.description)
         
     def populateCategories(self):
         categories = self.blogManager.getCategories()
+        self.catItemsMap = {}
         if not categories:
             self.categoriestree.clear()
             return
@@ -252,37 +374,19 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
             if cat.parentId not in parent_child_dict:
                 parent_child_dict[cat.parentId] = []
             parent_child_dict[cat.parentId].append(cat)
-        cat_item_mapping = {}
         for child in parent_child_dict['0']:
             catitem = QTreeWidgetItem(self.categoriestree)
+            self.catItemsMap[child.name] = catitem
             self._addChildren(child, catitem, parent_child_dict)
 
             #catitem.setIcon(0, blueico)
             catitem.setText(0, child.name)
             catitem.setFlags(Qt.ItemIsSelectable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsDragEnabled)
-            catitem.setCheckState(0, Qt.Unchecked)
             catitem.setToolTip(0, child.description)
-        """
-        for post in posts:
-            year, month = post.date[:2]
-            if year not in yeardict:
-                yeartree = QTreeWidgetItem(self.postTree)
-                yeartree.setIcon(0,  blueico)
-                yeartree.setText(0, str(year))
-                yeardict[year] = yeartree
-            if (year, month) not in year_month:
-                monthtree = QTreeWidgetItem(yeardict[year])
-                monthtree.setIcon(0,  blueico)
-                monthtree.setText(0, calendar.month_name[month])
-                year_month[(year, month)] = monthtree
-                
-            postobj = QTreeWidgetItem(year_month[(year, month)])
-            postobj.setIcon(0,  postico)
-            postobj.setText(0, post.title)
-            postobj.setToolTip(0,  post.title + "\n Sharmi")
-        """
+
     def populatePosts(self):
-        posts = self.blogManager.getLatestPosts()
+        rubriqueKey = str(self.blogCombo.itemData(self.blogCombo.currentIndex()).toString())
+        posts = self.blogManager.getLatestPosts(rubriqueKey=rubriqueKey)
         if not posts:
             self.postTree.clear()
             return
@@ -307,7 +411,8 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
             postobj = QTreeWidgetItem(year_month[(year, month)])
             postobj.setIcon(0,  postico)
             postobj.setText(0, post.title)
-            postobj.setToolTip(0,  post.title + "\n Sharmi")
+            postobj.setData(0, Qt.UserRole, post.postid)
+            postobj.setToolTip(0, post.title)
              
 
     def FORWARD_ACTION(self, action1,  action2):
@@ -430,23 +535,23 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         frame = self.editView.page().mainFrame();
         
         cmd = "editor = CKEDITOR.instances.editor1;editor.getData();"
-        return str(frame.evaluateJavaScript(cmd).toString());
+        return unicode(frame.evaluateJavaScript(cmd).toString());
         
     def setEditData(self,  data):
         frame = self.editView.page().mainFrame();
-        cmd = 'editor = CKEDITOR.instances.editor1;editor.setData(%s);' %repr(data)
-        return frame.evaluateJavaScript(cmd).toString()
+        cmd = 'editor = CKEDITOR.instances.editor1;editor.setData(%s);' %json.dumps(data)
+        x = frame.evaluateJavaScript(cmd).toString()
         
         
     def getCodeData(self):
         frame = self.codeView.page().mainFrame();
         cmd = "editor.mirror.getCode();"
-        return str(frame.evaluateJavaScript(cmd).toString());
+        return unicode(frame.evaluateJavaScript(cmd).toString());
         
     def setCodeData(self,  data):
         frame = self.codeView.page().mainFrame();
         
-        cmd = 'editor.mirror.setCode(%s);' %repr(data)  
+        cmd = 'editor.mirror.setCode(%s);' %json.dumps(data) 
         return frame.evaluateJavaScript(cmd).toString();
         
     def execCommand(self, cmd,  arg='null'):

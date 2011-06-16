@@ -95,7 +95,7 @@
            </attribute>
            <layout class="QVBoxLayout" name="verticalLayout_3">
             <item>
-             <widget class="QComboBox" name="comboBox_2"/>
+             <widget class="QComboBox" name="blogCombo"/>
             </item>
             <item>
              <widget class="QTreeWidget" name="postTree">
@@ -124,14 +124,14 @@
          </widget>
         </item>
         <item>
-         <widget class="QLabel" name="label">
+         <widget class="QLabel" name="postBlogLabel">
           <property name="text">
            <string>Post Belongs to:</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QComboBox" name="comboBox"/>
+         <widget class="QComboBox" name="postBlogCombo"/>
         </item>
         <item>
          <widget class="QToolBox" name="toolBox">

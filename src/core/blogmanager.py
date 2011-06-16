@@ -3,7 +3,9 @@ import os
 import sys
 import logging
 import pod
-from core.bloginterfaces.blog import RubriqueBlogAccount, LocalPost, Category, OnlinePost, RubriqueBlogAccountPOD
+import socket
+import datetime
+from core.bloginterfaces.blog import RubriqueBlogAccount, LocalPost, Category, OnlinePost, RubriqueBlogAccountPOD, BlogCategories
 import core.bloginterfaces.adapter as adapter
 import rsd
 METAWEBLOG = 'metaweblog'
@@ -15,6 +17,14 @@ class RubriqueBlogSetupError(Exception):
 
     def __str__(self):
         return repr(self.msg)
+
+class RubriqueBlogCommError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __str__(self):
+        return repr(self.msg)
+
 
 class UnknownPlatform(Exception):
     def __init__(self, platform):
@@ -29,7 +39,7 @@ class BlogManager(object):
         self.__setupDataPath()
         self.blogs = RubriqueBlogAccountPOD
         self.serviceApis = {}
-        self.posts = OnlinePost  #
+        self.posts = {}  #
         self.localposts = LocalPost
         self.categories = Category
         self.currentApi = None
@@ -43,7 +53,6 @@ class BlogManager(object):
             self.currentPost = self.appStatus.currentPost
         except pod.db.PodStoreError:
             self.setCurrentPost()
-        print "here"
         log.info("Current Post")
         log.info(self.currentPost)
         self.db.commit()
@@ -56,7 +65,14 @@ class BlogManager(object):
         funcDBCommit.__name__ = f.__name__
         return funcDBCommit
 
-
+    def errorHandler(f):
+        def errorfunc(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except socket.gaierror, e:
+                log.exception(e)
+                raise RubriqueBlogCommError("Unable to communicate with blog engine : Error received %s" %str(e))
+        return errorfunc
         
     def __setupDataPath(self):
         if platform.system() == "Linux":
@@ -72,7 +88,11 @@ class BlogManager(object):
         self.dbpath = os.path.join(self.datapath, "rubrique.db")
         self.db= pod.Db(file=self.dbpath)
 
+    @dbCommit
+    def deleteLocalPost(self, localpost):
+        del localpost
 
+        
     def getBlogs(self, url, username, password, blogId = None):
         try:
             blogService, homeurl, apis, preferred = rsd.get_rsd(url)
@@ -112,9 +132,8 @@ class BlogManager(object):
     @dbCommit
     def addBlog(self, blogacc):
         if blogacc:
-            RubriqueBlogAccountPOD(blogacc)
-            self.db.commit()
-        pass
+            blogacc = RubriqueBlogAccountPOD(blogacc)
+        return blogacc
 
     @dbCommit
     def setCurrentPost(self, post=None):
@@ -124,8 +143,47 @@ class BlogManager(object):
             self.currentPost = post
         self.appStatus.currentPost = self.currentPost
 
+    @dbCommit
+    def addCategory(self, catname):
+        if catname not in self.currentPost.categories:
+            self.currentPost.categories.append(catname)
+        print self.currentPost.categories
+
+    @dbCommit
+    def removeCategory(self, catname):
+        if catname in self.currentPost.categories:
+            self.currentPost.categories.remove(catname)
+        print self.currentPost.categories
+
+        
+
+    @dbCommit
+    def loadOnlinePost(self, rubriqueKey, postid):
+        post = self.serviceApis[rubriqueKey].getPost(postid)
+        self.setCurrentPost()
+        self.loadInCurrent(post)
+        self.setCurrentBlog(rubriqueKey)
+
+    def loadInCurrent(self, post):
+        self.currentPost.title = post.title
+        self.currentPost.postid = post.postid
+        self.currentPost.date = post.date
+        self.currentPost.permaLink = post.permaLink
+        self.currentPost.description = post.description
+        self.currentPost.textMore = post.textMore
+        self.currentPost.excerpt = post.excerpt
+        self.currentPost.link = post.link
+        self.currentPost.categories = post.categories
+        self.currentPost.tags = post.tags
+        self.currentPost.user = post.user
+        self.currentPost.allowPings = post.allowPings
+        self.currentPost.allowComments = post.allowComments
+        self.currentPost.status = post.status
+
     def getBlogByKey(self, key):
-        return (self.blogs.where.rubriqueKey == key).get_one()
+        for blog in self.blogs.where.rubriqueKey == key:
+            return blog
+        return None
 
 
     def setCurrentBlog(self, rubriqueKey):
@@ -141,16 +199,45 @@ class BlogManager(object):
         #    self.localposts[rubriqueKey] = SQLiteShelf(self.dbpath, "localposts_"+rubriqueKey)
         #if rubriqueKey not in self.categories:
         #    self.categories[rubriqueKey] = SQLiteShelf(self.dbpath, "categories_"+rubriqueKey)
-
-    def getLatestPosts(self, num=10):
-        if self.currentApi:
-            return self.currentApi.getPosts(num)
-        else:
+    @errorHandler
+    def getLatestPosts(self, num=10, rubriqueKey=None):
+        if rubriqueKey is None:
             return []
-        
+        #rubriqueKey = blog.rubriqueKey
+        blog = self.getBlogByKey(rubriqueKey)
+        if rubriqueKey in self.posts:
+            return self.posts[rubriqueKey]
+        if rubriqueKey not in self.serviceApis:
+            self.serviceApis[rubriqueKey] = self._serviceApiForAcc(blog)
+        latestPosts = self.serviceApis[rubriqueKey].getPosts(num)
+        self.posts[rubriqueKey] = latestPosts
+        return latestPosts
+    
+    @errorHandler
+    @dbCommit
     def getCategories(self):
         if self.currentApi:
-            return self.currentApi.getCategories()
+            blogcatmap = None
+            for blogcatmap in BlogCategories.where.blog == self.currentBlog:
+                blogcatmap = blogcatmap
+                break
+            if blogcatmap:
+                if datetime.datetime.utcnow() - blogcatmap.lastqueriedtime > datetime.timedelta(hours=1):
+                    try:
+                        blogcatmap.categories = self.currentApi.getCategories()
+                        blogcatmap.lastqueriedtime = datetime.datetime.utcnow()
+                    except e:
+                        log.exception("Failed to latest categories for blog" %self.currentBlog)
+                return blogcatmap.categories
+            else:
+                blogcatmap = BlogCategories()
+                blogcatmap.blog = self.currentBlog
+                try:
+                    blogcatmap.categories = self.currentApi.getCategories()
+                    blogcatmap.lastqueriedtime = datetime.datetime.utcnow()
+                except e:
+                    log.exception("Failed to latest categories for blog" %self.currentBlog)
+                return blogcatmap.categories
         else:
             return []
 
@@ -165,7 +252,7 @@ class BlogManager(object):
         self.currentPost.description = content
 
     def getPostBody(self):
-        return self.currentPost.description
+        return self.currentPost.description + self.currentPost.textMore
 
     @dbCommit
     def setTitle(self, title):

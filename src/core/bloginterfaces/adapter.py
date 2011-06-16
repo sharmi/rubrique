@@ -31,6 +31,9 @@ class Adapter(object):
     def getPosts(self, count=20):
         pass
 
+    def getPost(self, postid):
+        pass
+
     def publishPost(self, post):
         pass
 
@@ -79,7 +82,12 @@ class MetaWeblogAdapter(Adapter):
 
     @handleMWException
     def getPosts(self, count=20):
-           return self.client.getRecentPosts(count) 
+           return [post for post in self.client.getRecentPosts(count)] 
+
+    @handleMWException
+    def getPost(self, postid):
+        post = self.client.getPost(postid)
+        return post
 
     @handleMWException
     def publishDraft(self, post):

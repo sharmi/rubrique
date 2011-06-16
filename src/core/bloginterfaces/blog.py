@@ -63,22 +63,29 @@ class User:
         self.nickname = ''
         self.email = ''
         
-class Category(pod.Object):
+class Category(object):
     """Represents category item
     """    
     def __init__(self):
-        pod.Object.__init__(self)
         self.name = ''
         self.catId = ''
         self.blog = ''
         self.parentId= ''
         self.isPrimary = False
 
-class OnlinePost(pod.Object):
+class BlogCategories(pod.Object):
+    def __init__(self):
+        pod.Object.__init__(self)
+        self.blog = None
+        self.catgories = []
+        self.lastqueriedtime = None
+    
+
+class OnlinePost(object):
     """Represents post item
     """ 
     def __init__(self):
-        pod.Object.__init__(self)
+        self.postid = ''
         self.title = ''
         self.date = None
         self.permaLink = ''

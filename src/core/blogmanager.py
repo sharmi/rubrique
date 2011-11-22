@@ -1,11 +1,13 @@
 import platform
+import xmlrpclib
 import os
 import sys
 import logging
 import pod
 import socket
 import datetime
-from core.bloginterfaces.blog import RubriqueBlogAccount, LocalPost, Category, OnlinePost, RubriqueBlogAccountPOD, BlogCategories
+from elixir import *
+from core.bloginterfaces.blog import RubriqueBlogAccount, LocalPost, Category, OnlinePost, RubriqueBlogAccountDB, CategoryRec, AppStatus, generateRubriqueKey
 import core.bloginterfaces.adapter as adapter
 import rsd
 METAWEBLOG = 'metaweblog'
@@ -37,30 +39,32 @@ class BlogManager(object):
     myAppDataFolder = "rubrique"
     def __init__(self):
         self.__setupDataPath()
-        self.blogs = RubriqueBlogAccountPOD
+        self.blogs = RubriqueBlogAccountDB
         self.serviceApis = {}
         self.posts = {}  #
         self.localposts = LocalPost
         self.categories = Category
         self.currentApi = None
-        self.appStatus = self.db.store
-        try:
-            if self.appStatus.currentBlog:
-                self.setCurrentBlog(self.appStatus.currentBlog.rubriqueKey)
-        except pod.db.PodStoreError:
+        self.appStatus = AppStatus.query.first()
+        if self.appStatus is None:
+            self.appStatus = AppStatus()
+        if self.appStatus.currentBlog:
+            print "currentBlog is", self.appStatus.currentBlog
+            self.setCurrentBlog(self.appStatus.currentBlog.rubriqueKey)
+        else:
             self.currentBlog = None
-        try:
+        if self.appStatus.currentPost:
             self.currentPost = self.appStatus.currentPost
-        except pod.db.PodStoreError:
+        else:
             self.setCurrentPost()
         log.info("Current Post")
         log.info(self.currentPost)
-        self.db.commit()
+        session.commit()
 
     def dbCommit(f):
         def funcDBCommit(*args):
             returnVal = f(*args)
-            args[0].db.commit()
+            session.commit()
             return returnVal
         funcDBCommit.__name__ = f.__name__
         return funcDBCommit
@@ -70,6 +74,9 @@ class BlogManager(object):
             try:
                 return f(*args, **kwargs)
             except socket.gaierror, e:
+                log.exception(e)
+                raise RubriqueBlogCommError("Unable to communicate with blog engine : Error received %s" %str(e))
+            except xmlrpclib.ProtocolError, e:
                 log.exception(e)
                 raise RubriqueBlogCommError("Unable to communicate with blog engine : Error received %s" %str(e))
         return errorfunc
@@ -86,11 +93,11 @@ class BlogManager(object):
         if not os.path.exists(self.datapath):
             os.makedirs(self.datapath, 0744)
         self.dbpath = os.path.join(self.datapath, "rubrique.db")
-        self.db= pod.Db(file=self.dbpath)
 
     @dbCommit
     def deleteLocalPost(self, localpost):
-        del localpost
+        localpost.delete()
+
 
         
     def getBlogs(self, url, username, password, blogId = None):
@@ -132,8 +139,25 @@ class BlogManager(object):
     @dbCommit
     def addBlog(self, blogacc):
         if blogacc:
-            blogacc = RubriqueBlogAccountPOD(blogacc)
+            rubriqueKey = generateRubriqueKey(blogacc.blogname, blogacc.username)
+            if self.getBlogByKey(rubriqueKey):
+                return None
+            blogaccrec = RubriqueBlogAccountDB()
+            self.initBlogAccRec(blogaccrec, blogacc)
         return blogacc
+
+
+    def initBlogAccRec(self, rec, obj):
+        rec.blogid = obj.blogid
+        rec.blogname = obj.blogname.strip()
+        rec.username = obj.username.strip()
+        rec.password = obj.password
+        rec.homeurl = obj.homeurl
+        rec.apiurl = obj.apiurl
+        rec.apis = obj.apis
+        rec.preferred = obj.preferred
+        rec.resolved = obj.resolved
+        rec.rubriqueKey = generateRubriqueKey(rec.blogname, rec.username)
 
     @dbCommit
     def setCurrentPost(self, post=None):
@@ -144,15 +168,15 @@ class BlogManager(object):
         self.appStatus.currentPost = self.currentPost
 
     @dbCommit
-    def addCategory(self, catname):
-        if catname not in self.currentPost.categories:
-            self.currentPost.categories.append(catname)
+    def addCategory(self, catId):
+        if catId not in self.currentPost.categories:
+            self.currentPost.categories.append(catId)
         print self.currentPost.categories
 
     @dbCommit
-    def removeCategory(self, catname):
-        if catname in self.currentPost.categories:
-            self.currentPost.categories.remove(catname)
+    def removeCategory(self, catId):
+        if catId in self.currentPost.categories:
+            self.currentPost.categories.remove(catId)
         print self.currentPost.categories
 
         
@@ -181,27 +205,20 @@ class BlogManager(object):
         self.currentPost.status = post.status
 
     def getBlogByKey(self, key):
-        for blog in self.blogs.where.rubriqueKey == key:
-            return blog
-        return None
+        return self.blogs.get_by(rubriqueKey=key)
 
-
+    @dbCommit
     def setCurrentBlog(self, rubriqueKey):
         self.currentBlog = self.getBlogByKey(rubriqueKey)
         self.appStatus.currentBlog = self.currentBlog
         if rubriqueKey not in self.serviceApis:
             self.serviceApis[rubriqueKey] = self._serviceApiForAcc(self.currentBlog)
         self.currentApi = self.serviceApis[rubriqueKey]
-        self.db.commit()
-        #if rubriqueKey not in self.posts:
-        #    self.posts[rubriqueKey] = SQLiteShelf(self.dbpath, "posts_"+rubriqueKey)
-        #if rubriqueKey not in self.localposts:
-        #    self.localposts[rubriqueKey] = SQLiteShelf(self.dbpath, "localposts_"+rubriqueKey)
-        #if rubriqueKey not in self.categories:
-        #    self.categories[rubriqueKey] = SQLiteShelf(self.dbpath, "categories_"+rubriqueKey)
+        print "setup blog successfully"
+
     @errorHandler
-    def getLatestPosts(self, num=10, rubriqueKey=None):
-        if rubriqueKey is None:
+    def getLatestPosts(self, num=10, rubriqueKey=None, allBlogs=None):
+        if rubriqueKey is None or rubriqueKey == '':
             return []
         #rubriqueKey = blog.rubriqueKey
         blog = self.getBlogByKey(rubriqueKey)
@@ -216,30 +233,67 @@ class BlogManager(object):
     @errorHandler
     @dbCommit
     def getCategories(self):
-        if self.currentApi:
-            blogcatmap = None
-            for blogcatmap in BlogCategories.where.blog == self.currentBlog:
-                blogcatmap = blogcatmap
-                break
-            if blogcatmap:
-                if datetime.datetime.utcnow() - blogcatmap.lastqueriedtime > datetime.timedelta(hours=1):
-                    try:
-                        blogcatmap.categories = self.currentApi.getCategories()
-                        blogcatmap.lastqueriedtime = datetime.datetime.utcnow()
-                    except e:
-                        log.exception("Failed to latest categories for blog" %self.currentBlog)
-                return blogcatmap.categories
-            else:
-                blogcatmap = BlogCategories()
-                blogcatmap.blog = self.currentBlog
-                try:
-                    blogcatmap.categories = self.currentApi.getCategories()
-                    blogcatmap.lastqueriedtime = datetime.datetime.utcnow()
-                except e:
-                    log.exception("Failed to latest categories for blog" %self.currentBlog)
-                return blogcatmap.categories
+        print "getCategories", self.currentBlog
+        if self.currentBlog:
+            print "hi"
+            categories = CategoryRec.query.filter_by(blog=self.currentBlog).all()
+            print "categories", categories
+            if not categories:
+                print "refreshing categories"
+                self.refreshCategories()
+            categories = CategoryRec.query.filter_by(blog=self.currentBlog).all()
+            print "returning", categories
+            return categories
         else:
+            print "returning[]"
             return []
+    @dbCommit
+    def refreshCategories(self, rubriqueKey=None):
+        if rubriqueKey == '':
+            return []
+        if rubriqueKey is None:
+            if self.currentBlog:
+                blog = self.currentBlog
+                rubriqueKey = self.currentBlog.rubriqueKey
+            else:
+                return []
+        else:
+            blog = self.getBlogByKey(rubriqueKey)
+        
+        existing_categories = CategoryRec.query.filter_by(blog=blog)
+        categories = self.serviceApis[rubriqueKey].getCategories()
+        if not categories: return
+        existing_catids = [item.catId for item in existing_categories]
+        obtained_catids = [item.catId for item in categories]
+        catids_to_remove = set(existing_catids) - set(obtained_catids)
+        catids_to_update = set(existing_catids).intersection(set(obtained_catids))
+        new_catids = set(obtained_catids) - set(existing_catids)
+        for catId in catids_to_remove:
+            for rec in categories:
+                if rec.catId == catId:
+                    rec.delete()
+
+        for catId in catids_to_remove:
+            for rec in categories:
+                if rec.catId == catId:
+                    for obj in categories:
+                        if rec.catId == obj.catId:
+                            self.updateCategories(rec, obj)
+
+        for catId in new_catids:
+            for obj in categories:
+                if obj.catId == catId:
+                    rec = CategoryRec()
+                    self.updateCategories(rec, obj)
+                    rec.blog = blog
+            
+    def updateCategories(self, rec, obj):
+        rec.catId = obj.catId
+        rec.name = obj.name
+        rec.isPrimary = obj.isPrimary
+        rec.parentId = obj.parentId
+        rec.description = obj.description
+        
 
     def publish(self):
         if self.currentApi:

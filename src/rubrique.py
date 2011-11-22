@@ -53,7 +53,7 @@ class QPostItem(QListWidgetItem):
         self.post = None
 
 
-class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
+class Rubrique(QtGui.QMainWindow, Ui_MainWindow, EditFeature, EditTable):
     def __init__(self):
         QtGui.QMainWindow.__init__(self)
         Ui_MainWindow.__init__(self)
@@ -86,7 +86,12 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
 
         self.zoomLabel = QLabel();
         self.standardToolBar.insertWidget(self.actionZoomIn, self.zoomLabel);
-
+        self.fontComboBox = QtGui.QFontComboBox()
+        self.toolBar.insertWidget(self.actionBold, self.fontComboBox)
+        self.sizeComboBox = QtGui.QComboBox()
+        self.toolBar.insertWidget(self.actionBold, self.sizeComboBox)
+        self.editHistory = EditHistory()         
+        self.historyFlag = False
         self.zoomSlider = QSlider(self);
         self.zoomSlider.setOrientation(Qt.Horizontal);
         self.zoomSlider.setMaximumWidth(150);
@@ -95,10 +100,10 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         self.zoomSlider.setPageStep(100);
         self.standardToolBar.insertWidget(self.actionZoomOut, self.zoomSlider);
 
-        self.editView.setHtml(open('html/editor.html').read())
-        self.codeView.setHtml(open('html/codemirrorui.html').read())
-        self.editView.page().setContentEditable(False);
-        self.codeView.page().setContentEditable(False);
+        #self.editView.setHtml(open('html/editor.html').read())
+        #self.codeView.setHtml(open('html/codemirrorui.html').read())
+        #self.editView.page().setContentEditable(False);
+        #self.codeView.page().setContentEditable(False);
         self.keyLocalPostItemMap = {}
         self.editor = 0;
 
@@ -114,21 +119,20 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
 
         #if not self.load(initialFile):
         #    self.fileNew();
-        settings = self.editView.page().settings()
-        settings.setAttribute(QWebSettings.JavascriptEnabled, True
-        )
-        settings.setAttribute(QWebSettings.JavascriptCanAccessClipboard, True)
-        settings.setAttribute(QWebSettings.LocalContentCanAccessRemoteUrls, True)
-        settings.setAttribute(QWebSettings.LocalContentCanAccessFileUrls, True)
-        settings = self.codeView.page().settings()
-        settings.setAttribute(QWebSettings.JavascriptEnabled, True)
-        settings.setAttribute(QWebSettings.JavascriptCanAccessClipboard, True)
-        settings.setAttribute(QWebSettings.LocalContentCanAccessRemoteUrls, True)
-        settings.setAttribute(QWebSettings.LocalContentCanAccessFileUrls, True)
-        self.editView.load(QUrl(self.visualViewSrc))
-        self.codeView.load(QUrl(self.htmlViewSrc))
-        connect(self.editView.page(), SIGNAL('loadFinished(bool)'), self.loadPostContent)
-        self.reloadFlag = True
+        #settings = self.editView.page().settings()
+        #settings.setAttribute(QWebSettings.JavascriptEnabled, True)
+        #settings.setAttribute(QWebSettings.JavascriptCanAccessClipboard, True)
+        #settings.setAttribute(QWebSettings.LocalContentCanAccessRemoteUrls, True)
+        #settings.setAttribute(QWebSettings.LocalContentCanAccessFileUrls, True)
+        #settings = self.codeView.page().settings()
+        #settings.setAttribute(QWebSettings.JavascriptEnabled, True)
+        #settings.setAttribute(QWebSettings.JavascriptCanAccessClipboard, True)
+        #settings.setAttribute(QWebSettings.LocalContentCanAccessRemoteUrls, True)
+        #settings.setAttribute(QWebSettings.LocalContentCanAccessFileUrls, True)
+        #self.editView.load(QUrl(self.visualViewSrc))
+        #self.codeView.load(QUrl(self.htmlViewSrc))
+        #connect(self.editView.page(), SIGNAL('loadFinished(bool)'), self.loadPostContent)
+        #self.reloadFlag = True
         #connect(self.codeView.page(), SIGNAL('loadFinished(bool)'), self.loadPostContent)
         self.adjustSource()
         self.setupBlogData();
@@ -168,14 +172,77 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         self.connect(self.postTree, 
                      SIGNAL("itemActivated(QTreeWidgetItem * , int)"), self.loadOnlinePost)
         # Qt 4.5.0 has a bug: always returns 0 for QWebPage.SelectAll
-        
-    
+        connect(self.actionBold, SIGNAL("triggered()"), self.textBold)
+        connect(self.actionTable, SIGNAL("triggered()"), self.insertTable)
+        connect(self.actionItalics, SIGNAL("triggered()"), self.textItalic)
+        connect(self.actionUnderline, SIGNAL("triggered()"), self.textUnderline)
+        connect(self.actionBeforeRow, SIGNAL("triggered()"), self.insertRowsBefore)
+        connect(self.actionAfterRow, SIGNAL("triggered()"), self.insertRowsAfter)
+        connect(self.actionBeforeColumn, SIGNAL("triggered()"), self.insertColumnsBefore)
+        connect(self.actionAfterColumn, SIGNAL("triggered()"), self.insertColumnsAfter)
+        connect(self.actionDelete_Rows, SIGNAL("triggered()"), self.deleteRows)
+        connect(self.actionDelete_Columns, SIGNAL("triggered()"), self.deleteColumns)
+        connect(self.actionMerge_Selected_Cells, SIGNAL("triggered()"), self.mergeCells)
+        connect(self.actionSplit_Cell, SIGNAL("triggered()"), self.splitCell)
+        connect(self.actionUndo, SIGNAL("triggered()"), self.undo)
+        connect(self.actionRedo, SIGNAL("triggered()"), self.redo)
+        font = QtGui.QFont()
+        font.setFamily("Consolas")
+        font.setFixedPitch(True)
+        font.setPointSize(10)         
+        # the font metrics here will help
+        # building the margin width later
+        fm = QtGui.QFontMetrics(font)
+
+        ## set the default font of the self.codeView
+        ## and take the same font for line numbers
+        self.codeView.setFont(font)
+        self.codeView.setMarginsFont(font)
+
+        ## Line numbers
+        # conventionnaly, margin 0 is for line numbers
+        self.codeView.setMarginWidth(0, fm.width( "00000" ) + 5)
+        self.codeView.setMarginLineNumbers(0, True)
+
+        ## Edge Mode shows a red vetical bar at 80 chars
+        #self.codeView.setEdgeMode(QsciScintilla.EdgeLine)
+        #self.codeView.setEdgeColumn(80)
+        #self.codeView.setEdgeColor(QtGui.QColor("#FF0000"))
+
+        self.codeView.setWrapMode(QsciScintilla.WrapWord)
+        ## Folding visual : we will use boxes
+        self.codeView.setFolding(QsciScintilla.BoxedTreeFoldStyle)
+
+        ## Braces matching
+        self.codeView.setBraceMatching(QsciScintilla.SloppyBraceMatch)
+
+        ## Editing line color
+        self.codeView.setCaretLineVisible(True)
+        self.codeView.setCaretLineBackgroundColor(QtGui.QColor("#CDA869"))
+
+        ## Margins colors
+        # line numbers margin
+        self.codeView.setMarginsBackgroundColor(QtGui.QColor("#333333"))
+        self.codeView.setMarginsForegroundColor(QtGui.QColor("#CCCCCC"))
+
+        # folding margin colors (foreground,background)
+        self.codeView.setFoldMarginColors(QtGui.QColor("#99CC66"),QtGui.QColor("#333300"))
+        #self.editView.setHtml(open('textedit/example.html').read())
+        self.testView.setDocument(self.editView.document())
+        #highlighter = XMLHighlighter(self.testView.document())
+
+        ## Choose a lexer
+        lexer = QsciLexerHTML()
+        lexer.setDefaultFont(font)
+        self.codeView.setLexer(lexer)
+        self.codeView.setText(self.editView.toHtml())
+        connect(self.codeView, SIGNAL("textChanged()"), self.syncHistory)
+        connect(self.editView, SIGNAL("textChanged()"), self.syncHistory)
+        #self.editView.setDocument(self.codeView.document())
         #necessary to sync our actions
         #connect(self.editView.page(), SIGNAL("selectionChanged()"), self.adjustActions);
-    
-        connect(self.editView.page(), SIGNAL("contentsChanged()"), self.adjustSource);
-        connect(self.tabWidget,  SIGNAL("currentChanged(int)"),  self.syncEditors)
-
+        #connect(self.editView.page(), SIGNAL("contentsChanged()"), self.adjustSource);
+        #connect(self.tabWidget, SIGNAL("currentChanged(int)"),  self.syncEditors)
 
     def blogManagerErrorHandler(f):
         def errorfunc(*args):
@@ -215,6 +282,7 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         rubriqueKey = str(self.postBlogCombo.itemData(index).toString())
         self.blogManager.setCurrentBlog(rubriqueKey)
         self.populateCategories()
+        self.checkPostCategories()
         pass
 
     def setExcerpt(self):
@@ -237,6 +305,7 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
 
 
     def titleChanged(self, title):
+        title = unicode(title)
         self.blogManager.setTitle(title)
         self.setWindowTitle(self.tr("%1[*] - %2").arg(title).arg(self.tr(self.windowTitle)));
         self.keyLocalPostItemMap[self.blogManager.currentPost.id].setText(title)
@@ -246,7 +315,7 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
     def setLocalPostsList(self):
         #model = QStandardItemModel()
         #count = 0
-        for post in self.blogManager.localposts:
+        for post in self.blogManager.localposts.query.all():
             postitem = QPostItem(str(post))
             postitem.post = post
             self.localpostsList.addItem(postitem)
@@ -264,6 +333,7 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
     def initUIData(self):
         print self.blogManager.currentPost.categories
         title = self.blogManager.getTitle()
+        print self.windowTitle, "$", title
         self.setWindowTitle(self.tr("%1[*] - %2").arg(title).arg(self.tr(self.windowTitle)));
         self.postTitleTxt.setText(title)
         self.excerptTxt.setPlainText(self.blogManager.getExcerpt())
@@ -272,8 +342,8 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         self.commentsCheck.setChecked(self.blogManager.allowComments())
         self.setLocalPostsList()
         self.reloadFlag = True
-        self.codeView.reload()
-        self.editView.reload()
+        #self.codeView.reload()
+        #self.editView.reload()
 
 
     def loadPostContent(self, flag):
@@ -288,6 +358,43 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         self.preView.setHtml(postBody)
         #self.autosaveTimer.start(2000)
         
+    def syncHistory(self):
+        #0 -> EditView 1->CodeView 2->Preview
+        if self.historyFlag == True:
+            self.historyFlag = False
+            return
+        currentIndex =  self.tabWidget.currentIndex()
+        self.historyFlag = True
+        latestData = ''
+        if currentIndex == 0:
+            latestData = self.editView.toHtml()
+            #self.editHistory.addHistory(latestData)
+            self.codeView.setText(latestData)
+        elif currentIndex == 1:
+            latestData = self.codeView.text()
+            cursor = self.editView.textCursor()
+            cursor.select(QtGui.QTextCursor.Document)
+            cursor.insertHtml(latestData)
+            #self.editHistory.addHistory(latestData)
+            #self.editView.setHtml(latestData)
+            
+        self.preView.setHtml(latestData)
+     
+    def undo(self):
+        self.editView.document().undo()
+        #self.editHistory.undo()
+        self.dataFromHistory()
+
+    def redo(self):
+        self.editView.document().redo()
+        #self.editHistory.redo()
+        self.dataFromHistory()
+
+    def dataFromHistory(self):
+        data = self.editView.toHtml()
+        #self.editView.setHtml(data)
+        self.codeView.setText(data)
+        self.preView.setHtml(data)
 
     def syncEditors(self,  force=False):
         return True
@@ -295,12 +402,12 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         currentIndex =  self.tabWidget.currentIndex()
         if currentIndex!= self.editor or force==True:
             if self.editor == 0 :
-                latestData = self.getEditData()
-                self.setCodeData(latestData)
+                latestData = self.editView.toHtml()
+                self.codeView.setText(latestData)
                 #Set Preview data
             elif self.editor == 1:
-                latestData = self.getCodeData()
-                self.setEditData(latestData)
+                latestData = self.codeView.text()
+                self.editView.setHtml(latestData)
             self.preView.setHtml(latestData)
             if currentIndex in [0,  1]:
                self.editor  = currentIndex
@@ -314,19 +421,39 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
             self.postBlogCombo.addItem("%s: %s" %(blog.blogname, blog.username), blog.rubriqueKey)
             
             return
-        for blog in self.blogManager.blogs:
+        for rubriqueKey in self.blogManager.serviceApis:
             #blog = self.blogManager.blogs[rubrique_key]
+            blog = self.blogManager.getBlogByKey(rubriqueKey)
             self.blogCombo.addItem("%s: %s" %(blog.blogname, blog.username), blog.rubriqueKey)
             self.postBlogCombo.addItem("%s: %s" %(blog.blogname, blog.username), blog.rubriqueKey)
+        for rubriqueKey, (api, msg) in self.blogManager.failedServiceApis.iteritems():
+            blog = self.blogManager.getBlogByKey(rubriqueKey)
+            self.blogCombo.addItem("%s: %s" %(blog.blogname, blog.username), blog.rubriqueKey)
+            index = self.blogCombo.findData(rubriqueKey)
+            model = self.blogCombo.model()
+            item = model.item(index)
+            item.setSelectable(False)
+            item.setEnabled(False)
+            item.setToolTip(msg)
+            pass
+        if self.blogManager.currentBlog:
             rubriqueKey = self.blogManager.currentBlog.rubriqueKey
             index = self.blogCombo.findData(rubriqueKey)
             self.blogCombo.setCurrentIndex(index)
             index = self.postBlogCombo.findData(rubriqueKey)
             self.postBlogCombo.setCurrentIndex(index)
+        else:
+            index = -1
+            self.blogCombo.setCurrentIndex(index)
         return
     
     def addNewBlog(self, blog):
         addedBlog = self.blogManager.addBlog(blog)
+        if addedBlog is None:
+            title = "Added Blog is Duplicate"
+            message = "The Blog that you are trying to add already exists in our database."
+            QMessageBox.information(self, title, message, QMessageBox.Ok, QMessageBox.Ok) 
+            return
         self.populateBlogCombos(addedBlog)
         index = self.blogCombo.findData(addedBlog.rubriqueKey)
         self.blogCombo.setCurrentIndex(index)
@@ -344,14 +471,18 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         pass
     def setupBlogData(self):
         self.blogManager = getBlogManager()
+        #self.blogManager.loadConnections()
         self.populateBlogCombos()
         self.populatePosts()
+        self.blogManager.refreshCategories(allBlogs=True)
         self.populateCategories()
         self.initUIData()
         #self.blogManager.add_blog('wordpress', 'http://www.minvolai.com/blog/xmlrpc.php', 'sharmila', 'letmein')
 
     def _addChildren(self, parent, parentitem, parent_child_dict):
+        print "In"
         if parent.catId not in parent_child_dict:
+            print parent.catId
             return
         for child in parent_child_dict[parent.catId]:
             catitem = QTreeWidgetItem(parentitem)
@@ -374,7 +505,8 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
             if cat.parentId not in parent_child_dict:
                 parent_child_dict[cat.parentId] = []
             parent_child_dict[cat.parentId].append(cat)
-        for child in parent_child_dict['0']:
+        print parent_child_dict
+        for child in parent_child_dict[0]:
             catitem = QTreeWidgetItem(self.categoriestree)
             self.catItemsMap[child.name] = catitem
             self._addChildren(child, catitem, parent_child_dict)
@@ -385,7 +517,9 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
             catitem.setToolTip(0, child.description)
 
     def populatePosts(self):
+        print self.blogCombo.currentIndex()
         rubriqueKey = str(self.blogCombo.itemData(self.blogCombo.currentIndex()).toString())
+        print 'rubriquekey', rubriqueKey
         posts = self.blogManager.getLatestPosts(rubriqueKey=rubriqueKey)
         if not posts:
             self.postTree.clear()
@@ -396,7 +530,7 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         blueico = QIcon("images/turquoise_button.png")
         postico = QIcon("images/open_local_post.png")
         for post in posts:
-            year, month = post.date[:2]
+            year, month = post.date.year, post.date.month
             if year not in yeardict:
                 yeartree = QTreeWidgetItem(self.postTree)
                 yeartree.setIcon(0,  blueico)
@@ -493,7 +627,7 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
         self.actionZoomOut.setEnabled(percent > 25);
         self.actionZoomIn.setEnabled(percent < 400);
         factor = float(percent) / 100;
-        self.editView.setZoomFactor(factor);
+        #self.editView.setZoomFactor(factor);
 
         self.zoomLabel.setText(self.tr(" Zoom: %1% ").arg(percent));
         self.zoomSlider.setValue(percent);
@@ -513,7 +647,7 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
             percent -= 25;
             percent = 25 * (int((percent + 25 - 1) / 25));
             factor = float(percent) / 100;
-            self.editView.setZoomFactor(factor);
+            #self.editView.setZoomFactor(factor);
             self.actionZoomOut.setEnabled(percent > 25);
             self.actionZoomIn.setEnabled(True);
             self.zoomSlider.setValue(percent);
@@ -526,37 +660,37 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
             percent += 25;
             percent = 25 * (int(percent / 25));
             factor = float(percent) / 100;
-            self.editView.setZoomFactor(factor);
+            #self.editView.setZoomFactor(factor);
             self.actionZoomIn.setEnabled(percent < 400);
             self.actionZoomOut.setEnabled(True);
             self.zoomSlider.setValue(percent);
     
     def getEditData(self):
-        frame = self.editView.page().mainFrame();
+        #frame = self.editView.page().mainFrame();
         
         cmd = "editor = CKEDITOR.instances.editor1;editor.getData();"
         return unicode(frame.evaluateJavaScript(cmd).toString());
         
     def setEditData(self,  data):
-        frame = self.editView.page().mainFrame();
+        #frame = self.editView.page().mainFrame();
         cmd = 'editor = CKEDITOR.instances.editor1;editor.setData(%s);' %json.dumps(data)
         x = frame.evaluateJavaScript(cmd).toString()
         
         
     def getCodeData(self):
-        frame = self.codeView.page().mainFrame();
+        #frame = self.codeView.page().mainFrame();
         cmd = "editor.mirror.getCode();"
         return unicode(frame.evaluateJavaScript(cmd).toString());
         
     def setCodeData(self,  data):
-        frame = self.codeView.page().mainFrame();
+        #frame = self.codeView.page().mainFrame();
         
         cmd = 'editor.mirror.setCode(%s);' %json.dumps(data) 
         return frame.evaluateJavaScript(cmd).toString();
         
     def execCommand(self, cmd,  arg='null'):
 
-        frame = self.editView.page().mainFrame();
+        #frame = self.editView.page().mainFrame();
         js = QString("document.execCommand(\"%1\", false, \"%2\")").arg(cmd).arg(arg);
         result = frame.evaluateJavaScript(js)
         log.info("Javascript Execution Result: code: '%s', result type: '%s', result: '%s'" %(js,  result.typeName(),  result.toString()));
@@ -581,7 +715,7 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow):
     def changeTab(self, index):
 
         if self.sourceDirty and (index == 1): 
-            content = self.editView.page().mainFrame().toHtml();
+            content = self.editView.toHtml();
             #self.plainTextEdit.setPlainText(content);
             self.sourceDirty = False;
 

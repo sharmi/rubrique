@@ -97,7 +97,7 @@ class MetaWeblogClient:
         postObj.title             = post['title']
         postObj.excerpt         = post['mt_excerpt']
         postObj.user             = post['userid']
-        postObj.date             = time.strptime(str(post['dateCreated']), "%Y%m%dT%H:%M:%S")
+        postObj.date             = datetime.datetime(*time.strptime(str(post['dateCreated']), "%Y%m%dT%H:%M:%S")[:6])
         postObj.link             = post['link']
         postObj.textMore         = post['mt_text_more']
         postObj.allowComments     = post['mt_allow_comments'] == 1
@@ -193,7 +193,7 @@ class MetaWeblogClient:
 
         # Use provided date, if provided...
         if post.date:
-            blogcontent['dateCreated'] = xmlrpclib.DateTime(post.date) 
+            blogContent['dateCreated'] = xmlrpclib.DateTime(post.date) 
 
         # add categories
         i = 0

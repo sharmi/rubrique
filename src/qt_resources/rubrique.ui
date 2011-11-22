@@ -38,6 +38,12 @@
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_9">
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <property name="margin">
+     <number>0</number>
+    </property>
     <item>
      <widget class="QSplitter" name="splitter">
       <property name="enabled">
@@ -75,6 +81,21 @@
         <number>0</number>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout">
+        <property name="spacing">
+         <number>3</number>
+        </property>
+        <property name="leftMargin">
+         <number>3</number>
+        </property>
+        <property name="topMargin">
+         <number>3</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>2</number>
+        </property>
         <item>
          <widget class="QTabWidget" name="blogrel">
           <property name="tabPosition">
@@ -161,8 +182,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>230</width>
-             <height>130</height>
+             <width>245</width>
+             <height>142</height>
             </rect>
            </property>
            <attribute name="label">
@@ -200,8 +221,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>230</width>
-             <height>130</height>
+             <width>245</width>
+             <height>142</height>
             </rect>
            </property>
            <attribute name="label">
@@ -230,7 +251,7 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>230</width>
+             <width>245</width>
              <height>85</height>
             </rect>
            </property>
@@ -271,8 +292,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>230</width>
-             <height>130</height>
+             <width>245</width>
+             <height>142</height>
             </rect>
            </property>
            <attribute name="label">
@@ -345,7 +366,7 @@
            <enum>QTabWidget::Rounded</enum>
           </property>
           <property name="currentIndex">
-           <number>0</number>
+           <number>3</number>
           </property>
           <property name="iconSize">
            <size>
@@ -369,13 +390,7 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QWebView" name="editView" native="true">
-              <property name="url" stdset="0">
-               <url>
-                <string>about:blank</string>
-               </url>
-              </property>
-             </widget>
+             <widget class="QTextEdit" name="editView"/>
             </item>
            </layout>
           </widget>
@@ -392,11 +407,12 @@
              <number>0</number>
             </property>
             <item>
-             <widget class="QWebView" name="codeView" native="true">
-              <property name="url" stdset="0">
-               <url>
-                <string>about:blank</string>
-               </url>
+             <widget class="QsciScintilla" name="codeView">
+              <property name="toolTip">
+               <string/>
+              </property>
+              <property name="whatsThis">
+               <string/>
               </property>
              </widget>
             </item>
@@ -425,6 +441,28 @@
             </item>
            </layout>
           </widget>
+          <widget class="QWidget" name="tab_4">
+           <attribute name="title">
+            <string>Page</string>
+           </attribute>
+           <layout class="QHBoxLayout" name="horizontalLayout_2">
+            <item>
+             <widget class="QFrame" name="frame">
+              <property name="frameShape">
+               <enum>QFrame::StyledPanel</enum>
+              </property>
+              <property name="frameShadow">
+               <enum>QFrame::Raised</enum>
+              </property>
+              <layout class="QVBoxLayout" name="verticalLayout_12">
+               <item>
+                <widget class="QTextEdit" name="testView"/>
+               </item>
+              </layout>
+             </widget>
+            </item>
+           </layout>
+          </widget>
          </widget>
         </item>
        </layout>
@@ -439,7 +477,7 @@
      <x>0</x>
      <y>0</y>
      <width>1223</width>
-     <height>25</height>
+     <height>23</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuB_log">
@@ -456,6 +494,8 @@
      <string>&amp;Edit</string>
     </property>
     <addaction name="actionPreferences"/>
+    <addaction name="actionUndo"/>
+    <addaction name="actionRedo"/>
    </widget>
    <widget class="QMenu" name="menu_File">
     <property name="title">
@@ -468,13 +508,90 @@
     <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
+   <widget class="QMenu" name="menuFormat">
+    <property name="title">
+     <string>Format</string>
+    </property>
+    <widget class="QMenu" name="menuAlign">
+     <property name="title">
+      <string>Align</string>
+     </property>
+     <addaction name="actionLeft"/>
+     <addaction name="actionRight"/>
+     <addaction name="actionCenter"/>
+     <addaction name="actionJustify"/>
+    </widget>
+    <addaction name="actionBold"/>
+    <addaction name="actionItalics"/>
+    <addaction name="actionUnderline"/>
+    <addaction name="separator"/>
+    <addaction name="menuAlign"/>
+    <addaction name="separator"/>
+   </widget>
+   <widget class="QMenu" name="menuInsert">
+    <property name="title">
+     <string>Insert</string>
+    </property>
+    <addaction name="actionInsert_Image"/>
+    <addaction name="actionAdd_Link"/>
+    <addaction name="actionInsert_Video"/>
+    <addaction name="actionTable"/>
+   </widget>
+   <widget class="QMenu" name="menuTable">
+    <property name="title">
+     <string>Table</string>
+    </property>
+    <widget class="QMenu" name="menuInsert_Rows">
+     <property name="title">
+      <string>Insert Rows</string>
+     </property>
+     <addaction name="actionBeforeRow"/>
+     <addaction name="actionAfterRow"/>
+    </widget>
+    <widget class="QMenu" name="menuInsert_Columns">
+     <property name="title">
+      <string>Insert Columns</string>
+     </property>
+     <addaction name="actionBeforeColumn"/>
+     <addaction name="actionAfterColumn"/>
+    </widget>
+    <addaction name="actionTable"/>
+    <addaction name="actionFormat_Table"/>
+    <addaction name="menuInsert_Rows"/>
+    <addaction name="menuInsert_Columns"/>
+    <addaction name="actionDelete_Rows"/>
+    <addaction name="actionDelete_Columns"/>
+    <addaction name="actionSet_Column_Width"/>
+    <addaction name="actionMerge_Selected_Cells"/>
+    <addaction name="actionSplit_Cell"/>
+    <addaction name="actionCell_Background_Colour"/>
+   </widget>
+   <widget class="QMenu" name="menuTest">
+    <property name="title">
+     <string>Test</string>
+    </property>
+    <addaction name="separator"/>
+    <addaction name="actionUndo_2"/>
+    <addaction name="actionRedo_2"/>
+    <addaction name="actionClear"/>
+   </widget>
    <addaction name="menu_File"/>
    <addaction name="menu_Edit"/>
    <addaction name="menuB_log"/>
+   <addaction name="menuFormat"/>
+   <addaction name="menuInsert"/>
+   <addaction name="menuTable"/>
+   <addaction name="menuTest"/>
   </widget>
   <widget class="QToolBar" name="standardToolBar">
    <property name="windowTitle">
     <string>Standard</string>
+   </property>
+   <property name="iconSize">
+    <size>
+     <width>24</width>
+     <height>24</height>
+    </size>
    </property>
    <attribute name="toolBarArea">
     <enum>TopToolBarArea</enum>
@@ -490,9 +607,37 @@
    <addaction name="actionPublish"/>
    <addaction name="actionPublishAsDraft"/>
    <addaction name="separator"/>
-   <addaction name="actionZoomIn"/>
-   <addaction name="actionZoomOut"/>
    <addaction name="separator"/>
+  </widget>
+  <widget class="QToolBar" name="toolBar">
+   <property name="windowTitle">
+    <string>toolBar</string>
+   </property>
+   <property name="iconSize">
+    <size>
+     <width>16</width>
+     <height>16</height>
+    </size>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>true</bool>
+   </attribute>
+   <addaction name="actionBold"/>
+   <addaction name="actionItalics"/>
+   <addaction name="actionUnderline"/>
+   <addaction name="separator"/>
+   <addaction name="actionLeft"/>
+   <addaction name="actionCenter"/>
+   <addaction name="actionJustify"/>
+   <addaction name="actionRight"/>
+   <addaction name="separator"/>
+   <addaction name="actionInsert_Image"/>
+   <addaction name="actionAdd_Link"/>
+   <addaction name="actionInsert_Video"/>
+   <addaction name="actionTable"/>
   </widget>
   <action name="actionFileNew">
    <property name="icon">
@@ -610,8 +755,229 @@
     <string>Choose Current Blog</string>
    </property>
   </action>
+  <action name="actionBold">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="wysiwyg.qrc">
+     <normaloff>:/wysiwyg/bold.png</normaloff>:/wysiwyg/bold.png</iconset>
+   </property>
+   <property name="text">
+    <string>Bold</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+B</string>
+   </property>
+  </action>
+  <action name="actionItalics">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="wysiwyg.qrc">
+     <normaloff>:/wysiwyg/italic.png</normaloff>:/wysiwyg/italic.png</iconset>
+   </property>
+   <property name="text">
+    <string>Italics</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+I</string>
+   </property>
+  </action>
+  <action name="actionLeft">
+   <property name="icon">
+    <iconset resource="wysiwyg.qrc">
+     <normaloff>:/wysiwyg/align_left.png</normaloff>:/wysiwyg/align_left.png</iconset>
+   </property>
+   <property name="text">
+    <string>Left</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+L</string>
+   </property>
+  </action>
+  <action name="actionRight">
+   <property name="icon">
+    <iconset resource="wysiwyg.qrc">
+     <normaloff>:/wysiwyg/align_right.png</normaloff>:/wysiwyg/align_right.png</iconset>
+   </property>
+   <property name="text">
+    <string>Right</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+R</string>
+   </property>
+  </action>
+  <action name="actionCenter">
+   <property name="icon">
+    <iconset resource="wysiwyg.qrc">
+     <normaloff>:/wysiwyg/align_center.png</normaloff>:/wysiwyg/align_center.png</iconset>
+   </property>
+   <property name="text">
+    <string>Center</string>
+   </property>
+   <property name="toolTip">
+    <string>Center </string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+E</string>
+   </property>
+  </action>
+  <action name="actionJustify">
+   <property name="icon">
+    <iconset resource="wysiwyg.qrc">
+     <normaloff>:/wysiwyg/align_justify.png</normaloff>:/wysiwyg/align_justify.png</iconset>
+   </property>
+   <property name="text">
+    <string>Justify</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+J</string>
+   </property>
+  </action>
+  <action name="actionInsert_Image">
+   <property name="icon">
+    <iconset resource="wysiwyg.qrc">
+     <normaloff>:/wysiwyg/insert_image.png</normaloff>:/wysiwyg/insert_image.png</iconset>
+   </property>
+   <property name="text">
+    <string>Insert Image</string>
+   </property>
+  </action>
+  <action name="actionAdd_Link">
+   <property name="icon">
+    <iconset resource="wysiwyg.qrc">
+     <normaloff>:/wysiwyg/insert_link.png</normaloff>:/wysiwyg/insert_link.png</iconset>
+   </property>
+   <property name="text">
+    <string>Link</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+L</string>
+   </property>
+  </action>
+  <action name="actionInsert_Video">
+   <property name="text">
+    <string>Video</string>
+   </property>
+  </action>
+  <action name="actionTable">
+   <property name="icon">
+    <iconset resource="wysiwyg.qrc">
+     <normaloff>:/wysiwyg/table.png</normaloff>:/wysiwyg/table.png</iconset>
+   </property>
+   <property name="text">
+    <string>Table</string>
+   </property>
+  </action>
+  <action name="actionUnderline">
+   <property name="icon">
+    <iconset resource="wysiwyg.qrc">
+     <normaloff>:/wysiwyg/underline.png</normaloff>:/wysiwyg/underline.png</iconset>
+   </property>
+   <property name="text">
+    <string>Underline</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+U</string>
+   </property>
+  </action>
+  <action name="actionFormat_Table">
+   <property name="text">
+    <string>Format Table</string>
+   </property>
+  </action>
+  <action name="actionDelete_Columns">
+   <property name="text">
+    <string>Delete Columns</string>
+   </property>
+  </action>
+  <action name="actionSet_Column_Width">
+   <property name="text">
+    <string>Set Column Width</string>
+   </property>
+  </action>
+  <action name="actionDelete_Rows">
+   <property name="text">
+    <string>Delete Rows</string>
+   </property>
+  </action>
+  <action name="actionMerge_Selected_Cells">
+   <property name="text">
+    <string>Merge Selected Cells</string>
+   </property>
+  </action>
+  <action name="actionCell_Background_Colour">
+   <property name="text">
+    <string>Cell Background Colour</string>
+   </property>
+  </action>
+  <action name="actionBeforeRow">
+   <property name="text">
+    <string>Before</string>
+   </property>
+  </action>
+  <action name="actionAfterRow">
+   <property name="text">
+    <string>After</string>
+   </property>
+  </action>
+  <action name="actionBeforeColumn">
+   <property name="text">
+    <string>Before</string>
+   </property>
+  </action>
+  <action name="actionAfterColumn">
+   <property name="text">
+    <string>After</string>
+   </property>
+  </action>
+  <action name="actionSplit_Cell">
+   <property name="text">
+    <string>Split Cell</string>
+   </property>
+  </action>
+  <action name="actionUndo">
+   <property name="icon">
+    <iconset resource="wysiwyg.qrc">
+     <normaloff>:/wysiwyg/undo.png</normaloff>:/wysiwyg/undo.png</iconset>
+   </property>
+   <property name="text">
+    <string>Undo</string>
+   </property>
+  </action>
+  <action name="actionRedo">
+   <property name="icon">
+    <iconset resource="wysiwyg.qrc">
+     <normaloff>:/wysiwyg/redo.png</normaloff>:/wysiwyg/redo.png</iconset>
+   </property>
+   <property name="text">
+    <string>Redo</string>
+   </property>
+  </action>
+  <action name="actionUndo_2">
+   <property name="text">
+    <string>Undo</string>
+   </property>
+  </action>
+  <action name="actionRedo_2">
+   <property name="text">
+    <string>Redo</string>
+   </property>
+  </action>
+  <action name="actionClear">
+   <property name="text">
+    <string>Clear</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
+  <customwidget>
+   <class>QsciScintilla</class>
+   <extends>QFrame</extends>
+   <header>Qsci/qsciscintilla.h</header>
+  </customwidget>
   <customwidget>
    <class>QWebView</class>
    <extends>QWidget</extends>
@@ -620,6 +986,7 @@
  </customwidgets>
  <resources>
   <include location="rubrique.qrc"/>
+  <include location="wysiwyg.qrc"/>
  </resources>
  <connections/>
 </ui>

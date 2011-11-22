@@ -55,6 +55,9 @@ class Adapter(object):
     def uploadMediaObj(self):
         pass
 
+    def ping(self):
+        pass
+
 class MetaWeblogAdapter(Adapter):
     def __init__(self, *args):
         Adapter.__init__(self, *args)
@@ -62,12 +65,17 @@ class MetaWeblogAdapter(Adapter):
         self.client = MetaWeblogClient(self.url, self.username, self.password)
 
     def handleMWException(f):
-        def new_f(*args):
+        def new_f(*args, **kwargs):
             try:
-                return f(*args)
+                return f(*args, **kwargs)
             except MetaWeblogException, e:
                 log.error(e)
                 raise RubriqueBloggingError(e.message)
+            except xmlrpclib.ProtocolError, e:  
+                log.exception(e)
+                return None
+            except socket.error, e:  
+                log.exception(e)
         new_f.__name__ = f.__name__
         return new_f
 
@@ -113,6 +121,12 @@ class MetaWeblogAdapter(Adapter):
     def getBlogs(self):
         blogs = [blog for blog in self.client.getUsersBlogs()]
         return blogs
+    
+    def ping(self):
+        print 'ping called'
+        print "result", [x for x in self.client.getRecentPosts(1)]
+        print 'ping done'
+        return True
 
     @handleMWException
     def uploadMediaObj(self, filename=None, fileobj=None):

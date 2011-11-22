@@ -14,6 +14,9 @@ from PyQt4.QtWebKit import QWebPage, QWebView, QWebSettings
 from core.blogmanager import getBlogManager, RubriqueBlogCommError, RubriqueBlogSetupError
 import calendar
 from xml.sax.saxutils import quoteattr
+from PyQt4.Qsci import QsciScintilla, QsciScintillaBase, QsciLexerHTML, QsciDocument
+from editfeature import EditFeature
+from edittable import EditTable
 import addblogdialog 
 
 connect = QObject.connect
@@ -61,8 +64,6 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow, EditFeature, EditTable):
         self.fileName = '';
         self.windowTitle = 'Rubrique';
         self.sourceDirty = True;
-        self.zoomLabel = None;
-        self.zoomSlider = None;
         highlighter = None;
         ui_dialog = None;
         insertHtmlDialog = None;
@@ -72,130 +73,39 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow, EditFeature, EditTable):
         connect(self.tabWidget, SIGNAL("currentChanged(int)"), self.changeTab);
         self.resize(600, 600);
         self.blogs = {}
-        #self.spacer = QWidget(self);
-        #self.spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum);
-        #self.standardToolBar.insertWidget(self.actionZoomOut, self.spacer);
-        #self.labelSelector=QLabel("Current Blog: ", self.standardToolBar)
-        #self.comboSelector=QComboBox(self.standardToolBar)
-        #self.comboSelector.setEditable(False)
-        #self.connect(self.comboSelector,
-        #             SIGNAL("activated(int)"),
-        #             self.slotCurrentBlogChanged)
-        #self.standardToolBar.addWidget(self.labelSelector)
-        #self.standardToolBar.addWidget(self.comboSelector)
-
-        self.zoomLabel = QLabel();
-        self.standardToolBar.insertWidget(self.actionZoomIn, self.zoomLabel);
         self.fontComboBox = QtGui.QFontComboBox()
         self.toolBar.insertWidget(self.actionBold, self.fontComboBox)
         self.sizeComboBox = QtGui.QComboBox()
         self.toolBar.insertWidget(self.actionBold, self.sizeComboBox)
-        self.editHistory = EditHistory()         
-        self.historyFlag = False
-        self.zoomSlider = QSlider(self);
-        self.zoomSlider.setOrientation(Qt.Horizontal);
-        self.zoomSlider.setMaximumWidth(150);
-        self.zoomSlider.setRange(25, 400);
-        self.zoomSlider.setSingleStep(25);
-        self.zoomSlider.setPageStep(100);
-        self.standardToolBar.insertWidget(self.actionZoomOut, self.zoomSlider);
 
-        #self.editView.setHtml(open('html/editor.html').read())
-        #self.codeView.setHtml(open('html/codemirrorui.html').read())
-        #self.editView.page().setContentEditable(False);
-        #self.codeView.page().setContentEditable(False);
         self.keyLocalPostItemMap = {}
         self.editor = 0;
-
-
+        self.historyFlag = False;
         
         self.editView.setFocus();
     
-        #codedir = os.path.dirname( os.path.realpath( __file__ ) )
         codedir = determine_path()
-        self.visualViewSrc = urlunsplit(('file', '', os.path.join(codedir, 'html', 'editor.html'), '', ''))
-        #self.visualViewSrc = urlunsplit(('file', '', os.path.join(codedir, 'html', 'file-click-demo.html'), '', ''))
-        self.htmlViewSrc =  urlunsplit(('file', '', os.path.join(codedir, 'html', 'codemirrorui.html'), '', ''))
-
-        #if not self.load(initialFile):
-        #    self.fileNew();
-        #settings = self.editView.page().settings()
-        #settings.setAttribute(QWebSettings.JavascriptEnabled, True)
-        #settings.setAttribute(QWebSettings.JavascriptCanAccessClipboard, True)
-        #settings.setAttribute(QWebSettings.LocalContentCanAccessRemoteUrls, True)
-        #settings.setAttribute(QWebSettings.LocalContentCanAccessFileUrls, True)
-        #settings = self.codeView.page().settings()
-        #settings.setAttribute(QWebSettings.JavascriptEnabled, True)
-        #settings.setAttribute(QWebSettings.JavascriptCanAccessClipboard, True)
-        #settings.setAttribute(QWebSettings.LocalContentCanAccessRemoteUrls, True)
-        #settings.setAttribute(QWebSettings.LocalContentCanAccessFileUrls, True)
-        #self.editView.load(QUrl(self.visualViewSrc))
-        #self.codeView.load(QUrl(self.htmlViewSrc))
-        #connect(self.editView.page(), SIGNAL('loadFinished(bool)'), self.loadPostContent)
-        #self.reloadFlag = True
-        #connect(self.codeView.page(), SIGNAL('loadFinished(bool)'), self.loadPostContent)
         self.adjustSource()
         self.setupBlogData();
         self.setWindowModified(False)
-        self.changeZoom(100)
         self.autosaveTimer = QTimer(self)
         self.localpostsList.setContextMenuPolicy(Qt.ActionsContextMenu)
         self.actionLocalPostOpen = QAction("Open", self.localpostsList)
         self.actionLocalPostDelete = QAction("Delete", self.localpostsList)
         self.localpostsList.addAction(self.actionLocalPostOpen)
         self.localpostsList.addAction(self.actionLocalPostDelete)
-        connect(self.autosaveTimer, SIGNAL("timeout()"), self.saveBlogContent)
-        #self.autosaveTimer.start(2000)
-        connect(self.zoomSlider, SIGNAL("valueChanged(int)"), self.changeZoom);
-        connect(self.actionPublish,  SIGNAL("triggered()"), self.publish)
-        connect(self.actionFileNew, SIGNAL("triggered()"), self.fileNew);
-        connect(self.actionFileSave, SIGNAL("triggered()"), self.saveBlogContent);
-        connect(self.actionExit, SIGNAL("triggered()"), self.close);
-        connect(self.actionZoomOut, SIGNAL("triggered()"), self.zoomOut);
-        connect(self.actionZoomIn, SIGNAL("triggered()"), self.zoomIn);
-        connect(self.actionAddNewBlog, SIGNAL("triggered()"), self.addNewBlogDialog)     
-        connect(self.postTitleTxt, SIGNAL("textEdited(QString)"), self.titleChanged) 
-        connect(self.excerptTxt, SIGNAL("textChanged()"), self.setExcerpt)
-        connect(self.trackbacksCheck, SIGNAL("stateChanged(int)"), self.blogManager.allowTrackbacks)
-        connect(self.commentsCheck, SIGNAL("stateChanged(int)"), self.blogManager.allowComments)
-        connect(self.localpostsList, SIGNAL("itemActivated(QListWidgetItem *)"), self.loadLocalPost)
-        connect(self.actionLocalPostOpen, SIGNAL("triggered()"), self.loadLocalPost)
-        connect(self.actionLocalPostDelete, SIGNAL("triggered()"), self.deleteLocalPost)
-        connect(self.categoriestree, SIGNAL("itemChanged (QTreeWidgetItem *,int)"), self.changeCategories)
+        self.setupCodeView()
+        self.setupTriggers()
 
-        self.connect(self.blogCombo,
-                     SIGNAL("currentIndexChanged(int)"),
-                     self.currentBlogChanged)
-        self.connect(self.postBlogCombo,
-                     SIGNAL("currentIndexChanged(int)"),
-                     self.currentPostBlogChanged)
-        self.connect(self.postTree, 
-                     SIGNAL("itemActivated(QTreeWidgetItem * , int)"), self.loadOnlinePost)
-        # Qt 4.5.0 has a bug: always returns 0 for QWebPage.SelectAll
-        connect(self.actionBold, SIGNAL("triggered()"), self.textBold)
-        connect(self.actionTable, SIGNAL("triggered()"), self.insertTable)
-        connect(self.actionItalics, SIGNAL("triggered()"), self.textItalic)
-        connect(self.actionUnderline, SIGNAL("triggered()"), self.textUnderline)
-        connect(self.actionBeforeRow, SIGNAL("triggered()"), self.insertRowsBefore)
-        connect(self.actionAfterRow, SIGNAL("triggered()"), self.insertRowsAfter)
-        connect(self.actionBeforeColumn, SIGNAL("triggered()"), self.insertColumnsBefore)
-        connect(self.actionAfterColumn, SIGNAL("triggered()"), self.insertColumnsAfter)
-        connect(self.actionDelete_Rows, SIGNAL("triggered()"), self.deleteRows)
-        connect(self.actionDelete_Columns, SIGNAL("triggered()"), self.deleteColumns)
-        connect(self.actionMerge_Selected_Cells, SIGNAL("triggered()"), self.mergeCells)
-        connect(self.actionSplit_Cell, SIGNAL("triggered()"), self.splitCell)
-        connect(self.actionUndo, SIGNAL("triggered()"), self.undo)
-        connect(self.actionRedo, SIGNAL("triggered()"), self.redo)
+    def setupCodeView(self):
+        ## set the default font of the self.codeView
+        ## and take the same font for line numbers
         font = QtGui.QFont()
         font.setFamily("Consolas")
         font.setFixedPitch(True)
         font.setPointSize(10)         
-        # the font metrics here will help
-        # building the margin width later
         fm = QtGui.QFontMetrics(font)
 
-        ## set the default font of the self.codeView
-        ## and take the same font for line numbers
         self.codeView.setFont(font)
         self.codeView.setMarginsFont(font)
 
@@ -236,13 +146,49 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow, EditFeature, EditTable):
         lexer.setDefaultFont(font)
         self.codeView.setLexer(lexer)
         self.codeView.setText(self.editView.toHtml())
+
+    def setupTriggers(self):
+        connect(self.autosaveTimer, SIGNAL("timeout()"), self.saveBlogContent)
+        #self.autosaveTimer.start(2000)
+        connect(self.actionPublish,  SIGNAL("triggered()"), self.publish)
+        connect(self.actionFileNew, SIGNAL("triggered()"), self.fileNew);
+        connect(self.actionFileSave, SIGNAL("triggered()"), self.saveBlogContent);
+        connect(self.actionExit, SIGNAL("triggered()"), self.close);
+        connect(self.actionAddNewBlog, SIGNAL("triggered()"), self.addNewBlogDialog)     
+        connect(self.postTitleTxt, SIGNAL("textEdited(QString)"), self.titleChanged) 
+        connect(self.excerptTxt, SIGNAL("textChanged()"), self.setExcerpt)
+        connect(self.trackbacksCheck, SIGNAL("stateChanged(int)"), self.blogManager.allowTrackbacks)
+        connect(self.commentsCheck, SIGNAL("stateChanged(int)"), self.blogManager.allowComments)
+        connect(self.localpostsList, SIGNAL("itemActivated(QListWidgetItem *)"), self.loadLocalPost)
+        connect(self.actionLocalPostOpen, SIGNAL("triggered()"), self.loadLocalPost)
+        connect(self.actionLocalPostDelete, SIGNAL("triggered()"), self.deleteLocalPost)
+        connect(self.categoriestree, SIGNAL("itemChanged (QTreeWidgetItem *,int)"), self.changeCategories)
+
+        self.connect(self.blogCombo,
+                     SIGNAL("currentIndexChanged(int)"),
+                     self.currentBlogChanged)
+        self.connect(self.postBlogCombo,
+                     SIGNAL("currentIndexChanged(int)"),
+                     self.currentPostBlogChanged)
+        self.connect(self.postTree, 
+                     SIGNAL("itemActivated(QTreeWidgetItem * , int)"), self.loadOnlinePost)
+        connect(self.actionBold, SIGNAL("triggered()"), self.textBold)
+        connect(self.actionTable, SIGNAL("triggered()"), self.insertTable)
+        connect(self.actionItalics, SIGNAL("triggered()"), self.textItalic)
+        connect(self.actionUnderline, SIGNAL("triggered()"), self.textUnderline)
+        connect(self.actionBeforeRow, SIGNAL("triggered()"), self.insertRowsBefore)
+        connect(self.actionAfterRow, SIGNAL("triggered()"), self.insertRowsAfter)
+        connect(self.actionBeforeColumn, SIGNAL("triggered()"), self.insertColumnsBefore)
+        connect(self.actionAfterColumn, SIGNAL("triggered()"), self.insertColumnsAfter)
+        connect(self.actionDelete_Rows, SIGNAL("triggered()"), self.deleteRows)
+        connect(self.actionDelete_Columns, SIGNAL("triggered()"), self.deleteColumns)
+        connect(self.actionMerge_Selected_Cells, SIGNAL("triggered()"), self.mergeCells)
+        connect(self.actionSplit_Cell, SIGNAL("triggered()"), self.splitCell)
+        connect(self.actionUndo, SIGNAL("triggered()"), self.undo)
+        connect(self.actionRedo, SIGNAL("triggered()"), self.redo)
         connect(self.codeView, SIGNAL("textChanged()"), self.syncHistory)
         connect(self.editView, SIGNAL("textChanged()"), self.syncHistory)
-        #self.editView.setDocument(self.codeView.document())
-        #necessary to sync our actions
-        #connect(self.editView.page(), SIGNAL("selectionChanged()"), self.adjustActions);
-        #connect(self.editView.page(), SIGNAL("contentsChanged()"), self.adjustSource);
-        #connect(self.tabWidget, SIGNAL("currentChanged(int)"),  self.syncEditors)
+
 
     def blogManagerErrorHandler(f):
         def errorfunc(*args):
@@ -368,26 +314,22 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow, EditFeature, EditTable):
         latestData = ''
         if currentIndex == 0:
             latestData = self.editView.toHtml()
-            #self.editHistory.addHistory(latestData)
             self.codeView.setText(latestData)
         elif currentIndex == 1:
             latestData = self.codeView.text()
             cursor = self.editView.textCursor()
             cursor.select(QtGui.QTextCursor.Document)
             cursor.insertHtml(latestData)
-            #self.editHistory.addHistory(latestData)
             #self.editView.setHtml(latestData)
             
         self.preView.setHtml(latestData)
      
     def undo(self):
         self.editView.document().undo()
-        #self.editHistory.undo()
         self.dataFromHistory()
 
     def redo(self):
         self.editView.document().redo()
-        #self.editHistory.redo()
         self.dataFromHistory()
 
     def dataFromHistory(self):
@@ -622,86 +564,12 @@ class Rubrique(QtGui.QMainWindow, Ui_MainWindow, EditFeature, EditTable):
         # Fall back to QUrl's own tolerant parser.
         return QUrl(urlStr, QUrl.TolerantMode);
 
-
-    def changeZoom(self,  percent):
-        self.actionZoomOut.setEnabled(percent > 25);
-        self.actionZoomIn.setEnabled(percent < 400);
-        factor = float(percent) / 100;
-        #self.editView.setZoomFactor(factor);
-
-        self.zoomLabel.setText(self.tr(" Zoom: %1% ").arg(percent));
-        self.zoomSlider.setValue(percent);
-
     def closeEvent(self, e):
     
         if self.maybeSave():
             e.accept();
         else:
             e.ignore();
-
-    
-    def zoomOut(self):
-
-        percent = int(self.editView.zoomFactor() * 100)
-        if percent > 25: 
-            percent -= 25;
-            percent = 25 * (int((percent + 25 - 1) / 25));
-            factor = float(percent) / 100;
-            #self.editView.setZoomFactor(factor);
-            self.actionZoomOut.setEnabled(percent > 25);
-            self.actionZoomIn.setEnabled(True);
-            self.zoomSlider.setValue(percent);
-
-
-    def zoomIn(self):
-
-        percent = int(self.editView.zoomFactor() * 100);
-        if percent < 400: 
-            percent += 25;
-            percent = 25 * (int(percent / 25));
-            factor = float(percent) / 100;
-            #self.editView.setZoomFactor(factor);
-            self.actionZoomIn.setEnabled(percent < 400);
-            self.actionZoomOut.setEnabled(True);
-            self.zoomSlider.setValue(percent);
-    
-    def getEditData(self):
-        #frame = self.editView.page().mainFrame();
-        
-        cmd = "editor = CKEDITOR.instances.editor1;editor.getData();"
-        return unicode(frame.evaluateJavaScript(cmd).toString());
-        
-    def setEditData(self,  data):
-        #frame = self.editView.page().mainFrame();
-        cmd = 'editor = CKEDITOR.instances.editor1;editor.setData(%s);' %json.dumps(data)
-        x = frame.evaluateJavaScript(cmd).toString()
-        
-        
-    def getCodeData(self):
-        #frame = self.codeView.page().mainFrame();
-        cmd = "editor.mirror.getCode();"
-        return unicode(frame.evaluateJavaScript(cmd).toString());
-        
-    def setCodeData(self,  data):
-        #frame = self.codeView.page().mainFrame();
-        
-        cmd = 'editor.mirror.setCode(%s);' %json.dumps(data) 
-        return frame.evaluateJavaScript(cmd).toString();
-        
-    def execCommand(self, cmd,  arg='null'):
-
-        #frame = self.editView.page().mainFrame();
-        js = QString("document.execCommand(\"%1\", false, \"%2\")").arg(cmd).arg(arg);
-        result = frame.evaluateJavaScript(js)
-        log.info("Javascript Execution Result: code: '%s', result type: '%s', result: '%s'" %(js,  result.typeName(),  result.toString()));
-
-    def queryCommandState(self, cmd):
-
-        frame = self.editView.page().mainFrame();
-        js = QString("document.queryCommandState(\"%1\", false, null)").arg(cmd);
-        result = frame.evaluateJavaScript(js);
-        return result.toString().simplified().toLower() == "True";
-
 
 #define FOLLOW_ENABLE(a1, a2) a1.setEnabled(self.editView.pageAction(a2).isEnabled())
 #define FOLLOW_CHECK(a1, a2) a1.setChecked(self.editView.pageAction(a2).isChecked())

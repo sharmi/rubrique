@@ -10,6 +10,7 @@ from elixir import *
 from core.bloginterfaces.blog import RubriqueBlogAccount, LocalPost, Category, OnlinePost, RubriqueBlogAccountDB, CategoryRec, AppStatus, generateRubriqueKey
 import core.bloginterfaces.adapter as adapter
 import rsd
+from core.bloginterfaces.metaweblog import MetaWeblogException
 METAWEBLOG = 'metaweblog'
 WORDPRESS = 'wordpress'
 log = logging.getLogger("rubrique")
@@ -41,14 +42,16 @@ class BlogManager(object):
         self.__setupDataPath()
         self.blogs = RubriqueBlogAccountDB
         self.serviceApis = {}
+        self.failedServiceApis = {}
         self.posts = {}  #
         self.localposts = LocalPost
         self.categories = Category
         self.currentApi = None
+        self.loadConnections()
         self.appStatus = AppStatus.query.first()
         if self.appStatus is None:
             self.appStatus = AppStatus()
-        if self.appStatus.currentBlog:
+        if self.appStatus.currentBlog and self.appStatus.currentBlog.rubriqueKey in self.serviceApis:
             print "currentBlog is", self.appStatus.currentBlog
             self.setCurrentBlog(self.appStatus.currentBlog.rubriqueKey)
         else:
@@ -61,9 +64,12 @@ class BlogManager(object):
         log.info(self.currentPost)
         session.commit()
 
+    def allKeys(self):
+        return [x.rubriqueKey for x in self.blogs.query.all()]
+
     def dbCommit(f):
-        def funcDBCommit(*args):
-            returnVal = f(*args)
+        def funcDBCommit(*args, **kwargs):
+            returnVal = f(*args, **kwargs)
             session.commit()
             return returnVal
         funcDBCommit.__name__ = f.__name__
@@ -76,9 +82,9 @@ class BlogManager(object):
             except socket.gaierror, e:
                 log.exception(e)
                 raise RubriqueBlogCommError("Unable to communicate with blog engine : Error received %s" %str(e))
-            except xmlrpclib.ProtocolError, e:
-                log.exception(e)
-                raise RubriqueBlogCommError("Unable to communicate with blog engine : Error received %s" %str(e))
+            #except xmlrpclib.ProtocolError, e:
+            #    log.exception(e)
+            #    raise RubriqueBlogCommError("Unable to communicate with blog engine : Error received %s" %str(e))
         return errorfunc
         
     def __setupDataPath(self):
@@ -171,13 +177,11 @@ class BlogManager(object):
     def addCategory(self, catId):
         if catId not in self.currentPost.categories:
             self.currentPost.categories.append(catId)
-        print self.currentPost.categories
 
     @dbCommit
     def removeCategory(self, catId):
         if catId in self.currentPost.categories:
             self.currentPost.categories.remove(catId)
-        print self.currentPost.categories
 
         
 
@@ -207,6 +211,19 @@ class BlogManager(object):
     def getBlogByKey(self, key):
         return self.blogs.get_by(rubriqueKey=key)
 
+    def loadConnections(self):
+        for blog in self.blogs.query.all():
+            api = self._serviceApiForAcc(blog)
+            try:
+                api.ping()
+                self.serviceApis[blog.rubriqueKey] = api
+                print blog.rubriqueKey, 'passed'
+            except (xmlrpclib.ProtocolError, socket.gaierror, xmlrpclib.Fault, MetaWeblogException, socket.error), e:
+                print blog.rubriqueKey, 'failed'
+                log.warning(e)
+                self.failedServiceApis[blog.rubriqueKey] = (api, str(e))
+                
+
     @dbCommit
     def setCurrentBlog(self, rubriqueKey):
         self.currentBlog = self.getBlogByKey(rubriqueKey)
@@ -224,8 +241,8 @@ class BlogManager(object):
         blog = self.getBlogByKey(rubriqueKey)
         if rubriqueKey in self.posts:
             return self.posts[rubriqueKey]
-        if rubriqueKey not in self.serviceApis:
-            self.serviceApis[rubriqueKey] = self._serviceApiForAcc(blog)
+        #if rubriqueKey not in self.serviceApis:
+        #    self.serviceApis[rubriqueKey] = self._serviceApiForAcc(blog)
         latestPosts = self.serviceApis[rubriqueKey].getPosts(num)
         self.posts[rubriqueKey] = latestPosts
         return latestPosts
@@ -233,22 +250,21 @@ class BlogManager(object):
     @errorHandler
     @dbCommit
     def getCategories(self):
-        print "getCategories", self.currentBlog
         if self.currentBlog:
-            print "hi"
             categories = CategoryRec.query.filter_by(blog=self.currentBlog).all()
-            print "categories", categories
             if not categories:
-                print "refreshing categories"
                 self.refreshCategories()
             categories = CategoryRec.query.filter_by(blog=self.currentBlog).all()
-            print "returning", categories
             return categories
         else:
-            print "returning[]"
             return []
+
     @dbCommit
-    def refreshCategories(self, rubriqueKey=None):
+    def refreshCategories(self, rubriqueKey=None, allBlogs=False):
+        if allBlogs:
+            for key in self.serviceApis:
+                self.refreshCategories(rubriqueKey=key)
+            return
         if rubriqueKey == '':
             return []
         if rubriqueKey is None:

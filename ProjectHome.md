@@ -1,0 +1,1 @@
+I've been frustrated trying to find a blog client for linux that has all the features that I desire (tables, for instance).  Some came close but I failed to find one that I liked.  This is an attempt to create one that works for me.  Hopefully you will find it useful too :)
